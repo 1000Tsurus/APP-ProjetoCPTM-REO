@@ -20,7 +20,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Tab One',
+          title: 'Operação',
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
@@ -51,7 +51,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="two"
         options={{
-          title: 'Tab Two',
+          title: 'Relatórios',
           tabBarIcon: ({ color }) => (
             <SymbolView
               name={{
