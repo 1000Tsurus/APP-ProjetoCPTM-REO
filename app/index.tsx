@@ -2,6 +2,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
+import { findOperatorProfile, useSession } from '@/contexts/SessionContext';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -42,6 +43,7 @@ async function deleteSecureItem(key: string) {
 }
 
 export default function LoginScreen() {
+  const { startSession } = useSession();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [keepConnected, setKeepConnected] = useState(false);
@@ -91,12 +93,17 @@ export default function LoginScreen() {
     await setSecureItem(KEEP_CONNECTED_KEY, expiresAt);
   }
 
-  function signIn() {
+  async function signIn() {
     if (!identifier.trim() || !password.trim()) {
       Alert.alert('Acesso incompleto', 'Informe matrícula/e-mail e senha para continuar.');
       return;
     }
 
+    const savedProfile = await findOperatorProfile(identifier);
+    await startSession(savedProfile ?? {
+      nomeCompleto: '', matriculaOuEmail: identifier.trim(),
+      funcaoOperacional: 'Inspetor CPTM', baseLotacao: '',
+    });
     router.replace('/(tabs)');
   }
 
@@ -122,6 +129,12 @@ export default function LoginScreen() {
       });
 
       if (result.success) {
+        const savedProfile = await findOperatorProfile();
+        if (!savedProfile) {
+          Alert.alert('Identifique seu perfil', 'Entre com sua matrícula e senha antes de usar o acesso biométrico.');
+          return;
+        }
+        await startSession(savedProfile);
         router.replace('/(tabs)');
       }
     } finally {
