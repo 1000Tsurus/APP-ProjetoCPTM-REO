@@ -1,7 +1,8 @@
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useEffect } from 'react';
+import { Fragment, useEffect } from 'react';
+import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
@@ -46,9 +47,11 @@ export default function RootLayout() {
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme();
+  // SDK 58 uses CSS safe-area insets on web; keep the native provider on Android/iOS.
+  const SafeAreaRoot = Platform.OS === 'web' ? Fragment : SafeAreaProvider;
 
   return (
-    <SafeAreaProvider>
+    <SafeAreaRoot>
       <SessionProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
@@ -60,6 +63,6 @@ function RootLayoutNav() {
           </Stack>
         </ThemeProvider>
       </SessionProvider>
-    </SafeAreaProvider>
+    </SafeAreaRoot>
   );
 }

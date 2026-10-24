@@ -1,8 +1,8 @@
 ﻿import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InspectionCard } from '@/components/operation/InspectionCard';
@@ -22,9 +22,10 @@ const FILTERS: { id: Filter; label: string }[] = [
 const formatNumber = (value: number) => value.toLocaleString('pt-BR');
 
 export default function HomeScreen() {
+  const router = useRouter();
   const { profile, endSession } = useSession();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [panel, setPanel] = useState<Panel>(null);
   const [category, setCategory] = useState<AnalysisCategory>('dormentes');

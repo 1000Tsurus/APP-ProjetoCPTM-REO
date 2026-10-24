@@ -1,5 +1,5 @@
 import * as LocalAuthentication from 'expo-local-authentication';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { findOperatorProfile, useSession } from '@/contexts/SessionContext';
@@ -43,6 +43,7 @@ async function deleteSecureItem(key: string) {
 }
 
 export default function LoginScreen() {
+  const router = useRouter();
   const { startSession } = useSession();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');

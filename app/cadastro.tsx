@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { router } from 'expo-router';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
@@ -30,6 +30,7 @@ const BASES: readonly string[] = [
 ];
 
 export default function CadastroScreen() {
+  const router = useRouter();
   const { startSession } = useSession();
   const [nomeCompleto, setNomeCompleto] = useState<CredencialForm['nomeCompleto']>('');
   const [matriculaOuEmail, setMatriculaOuEmail] = useState<CredencialForm['matriculaOuEmail']>('');

@@ -20,4 +20,4 @@ pelo backend na integração dos serviços reais.
 
 Iniciar: `npm install` e `npm run web`.
 Verificar: `npx tsc --noEmit` e `npx expo export --platform web`.
-Referência: https://docs.expo.dev/versions/v57.0.0/.
+Referência: https://docs.expo.dev/versions/v58.0.0/.
