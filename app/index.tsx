@@ -103,7 +103,7 @@ export default function LoginScreen() {
     const savedProfile = await findOperatorProfile(identifier);
     await startSession(savedProfile ?? {
       nomeCompleto: '', matriculaOuEmail: identifier.trim(),
-      funcaoOperacional: 'Inspetor CPTM', baseLotacao: '',
+      funcaoOperacional: '', baseLotacao: '',
     });
     router.replace('/(tabs)');
   }

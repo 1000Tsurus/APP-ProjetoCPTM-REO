@@ -1,8 +1,8 @@
 ﻿import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InspectionCard } from '@/components/operation/InspectionCard';
@@ -13,7 +13,7 @@ import {
   type AnalysisCategory, type Inspection,
 } from '@/data/operational-summary';
 
-type Panel = 'categories' | 'scan' | 'lots' | 'history' | 'profile' | 'calibration' | 'inspection' | 'category' | null;
+type Panel = 'categories' | 'scan' | 'lots' | 'history' | 'calibration' | 'inspection' | 'category' | null;
 type Filter = 'all' | 'rejected' | 'lot' | 'dormentes';
 const FILTERS: { id: Filter; label: string }[] = [
   { id: 'all', label: 'Todos' }, { id: 'rejected', label: 'Reprovados' },
@@ -23,14 +23,18 @@ const formatNumber = (value: number) => value.toLocaleString('pt-BR');
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { profile, endSession } = useSession();
+  const { open, request } = useLocalSearchParams<{ open?: string; request?: string }>();
+  const { profile } = useSession();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollViewInstance>(null);
+  const scrollRef = useRef<ScrollView>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [panel, setPanel] = useState<Panel>(null);
   const [category, setCategory] = useState<AnalysisCategory>('dormentes');
   const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
   const [selectedLot, setSelectedLot] = useState<string | null>(null);
+  useEffect(() => {
+    if (open === 'scan' || open === 'history') setPanel(open);
+  }, [open, request]);
   const total = volumeSummary.approved + volumeSummary.rejected + volumeSummary.pending;
   const processed = total ? ((total - volumeSummary.pending) / total) * 100 : 0;
   const goalProgress = operationalGoal.target > 0
@@ -53,14 +57,9 @@ export default function HomeScreen() {
     setPanel('category');
   }
 
-  async function signOut() {
-    await endSession();
-    router.replace('/login');
-  }
-
   const panelTitles: Record<Exclude<Panel, null>, string> = {
     categories: 'Categorias de análise', scan: 'Iniciar inspeção', lots: 'Lotes da operação',
-    history: 'Histórico de inspeções', profile: 'Meu perfil', calibration: 'Sensor LiDAR',
+    history: 'Histórico de inspeções', calibration: 'Sensor LiDAR',
     inspection: 'Detalhes da inspeção', category: currentCategory.title,
   };
 
@@ -85,7 +84,7 @@ export default function HomeScreen() {
             <View style={styles.brandIcon}><Ionicons name="train-outline" size={22} color="#fff" /></View>
             <View style={styles.brandCopy}><Text style={styles.brand}>RAILLOG INSPECT</Text><Text style={styles.pageTitle}>Início</Text></View>
             <View style={styles.demoBadge}><View style={styles.demoDot} /><Text style={styles.demoBadgeText}>Demo</Text></View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Abrir meu perfil" onPress={() => setPanel('profile')} style={styles.avatar}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Abrir meu perfil" onPress={() => router.push('/(tabs)/perfil')} style={styles.avatar}>
               <Ionicons name="person-outline" size={18} color="#fff" />
             </Pressable>
           </View>
@@ -93,7 +92,7 @@ export default function HomeScreen() {
           <View style={styles.greetingRow}>
             <View style={styles.greetingCopy}>
               <Text style={styles.greeting}>Olá, {firstName} <Text style={styles.wave}>👋</Text></Text>
-              <Text style={styles.subtitle}>{profile?.funcaoOperacional === 'Pátio' ? 'Operador de Campo' : profile?.funcaoOperacional || 'Inspetor CPTM'}{profile?.baseLotacao ? ` • ${profile.baseLotacao.split(' • ')[0]}` : ` • ${profile?.matriculaOuEmail || 'CPTM'}`}</Text>
+              <Text style={styles.subtitle}>{profile?.funcaoOperacional === 'Pátio' ? 'Operador de Campo' : profile?.funcaoOperacional || 'Função não informada'}{profile?.baseLotacao ? ` • ${profile.baseLotacao.split(' • ')[0]}` : ` • ${profile?.matriculaOuEmail || 'CPTM'}`}</Text>
             </View>
             <View style={styles.connectionBadge}><Ionicons name="location-outline" size={12} color="#646a6c" /><Text style={styles.connectionText}>GPS INATIVO</Text></View>
           </View>
@@ -158,10 +157,10 @@ export default function HomeScreen() {
       <View pointerEvents="box-none" style={[styles.navigationContainer, { bottom: Math.max(14, insets.bottom) }]}>
         <View style={styles.navigation}>
           <Pressable accessibilityRole="button" accessibilityLabel="Início" accessibilityState={{ selected: panel === null }} onPress={() => { setPanel(null); scrollRef.current?.scrollTo({ y: 0, animated: true }); }} style={styles.navItem}><Ionicons name="grid-outline" size={21} color="#fff" /><Text style={styles.navLabel}>Início</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => { setSelectedLot(null); setPanel('lots'); }} style={styles.navItem}><Ionicons name="layers-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Lotes</Text></Pressable>
+          <Pressable accessibilityRole="button" onPress={() => router.navigate('/(tabs)/lotes')} style={styles.navItem}><Ionicons name="layers-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Lotes</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Nova inspeção" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={28} color="#fff" /></Pressable>
           <Pressable accessibilityRole="button" onPress={() => setPanel('history')} style={styles.navItem}><Ionicons name="time-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => setPanel('profile')} style={styles.navItem}><Ionicons name="options-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Ajustes</Text></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Perfil" onPress={() => router.navigate('/(tabs)/perfil')} style={styles.navItem}><Ionicons name="person-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Perfil</Text></Pressable>
         </View>
       </View>
 
@@ -189,12 +188,6 @@ export default function HomeScreen() {
           <Text style={styles.panelHint}>Registro ilustrativo. Fotos, medições e laudos serão fornecidos pelo serviço de inspeções.</Text>
         </>}
         {panel === 'calibration' && <><View style={styles.panelIcon}><Ionicons name="scan-outline" size={36} color="#e52329" /></View><Text style={styles.detailId}>Nenhum sensor conectado</Text><Text style={styles.panelDescription}>Conecte um sensor LiDAR compatível para consultar a calibração, a precisão e a última sincronização.</Text><Text style={styles.panelHint}>A integração com o equipamento ainda não está disponível neste demonstrativo.</Text></>}
-        {panel === 'profile' && <>
-          <View style={styles.detailHero}><View style={styles.profileAvatar}><Ionicons name="person-outline" size={28} color="#fff" /></View><Text style={styles.detailId}>{profile?.nomeCompleto || 'Inspetor CPTM'}</Text><Text style={styles.caption}>{profile?.matriculaOuEmail}</Text></View>
-          {[['Função', profile?.funcaoOperacional], ['Base / Pátio', profile?.baseLotacao || 'Não informada'], ['Meta diária', `${operationalGoal.target} lotes`], ['Responsável pela meta', operationalGoal.assignedBy]].map(([label, value]) => <View key={label} style={styles.detailRow}><Text style={styles.caption}>{label}</Text><Text style={styles.detailValue}>{value}</Text></View>)}
-          <Text style={styles.panelHint}>A meta é definida pelo gestor e não pode ser alterada pelo inspetor. Os valores exibidos são demonstrativos.</Text>
-          <Pressable accessibilityRole="button" onPress={() => void signOut()} style={styles.signOut}><Ionicons name="log-out-outline" size={21} color="#e52329" /><Text style={styles.signOutText}>Sair da conta</Text></Pressable>
-        </>}
       </OperationPanel>
     </SafeAreaView>
   );
@@ -280,7 +273,4 @@ const styles = StyleSheet.create({
   detailId: { color: '#303636', fontSize: 20, fontWeight: '600' }, detailStatus: { color: '#303636', fontSize: 13, fontWeight: '600' },
   detailRow: { borderBottomWidth: 1, borderBottomColor: '#e7ebec', paddingVertical: 14, gap: 5 },
   detailValue: { color: '#303636', fontSize: 14, lineHeight: 20 },
-  profileAvatar: { width: 60, height: 60, backgroundColor: '#be0822', borderRadius: 30, alignItems: 'center', justifyContent: 'center' },
-  signOut: { flexDirection: 'row', gap: 9, alignItems: 'center', justifyContent: 'center', padding: 17, marginTop: 24, borderRadius: 25, backgroundColor: '#fce7e8' },
-  signOutText: { color: '#e52329', fontSize: 14, fontWeight: '600' },
 });

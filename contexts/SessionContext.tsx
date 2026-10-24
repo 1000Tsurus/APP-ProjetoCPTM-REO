@@ -30,12 +30,16 @@ export async function findOperatorProfile(identifier?: string): Promise<Operator
 
 const SessionContext = createContext<{
   profile: OperatorProfile | null;
+  profileUpdated: boolean;
   startSession: (profile: OperatorProfile) => Promise<void>;
+  updateProfile: (changes: Pick<OperatorProfile, 'nomeCompleto'>) => Promise<void>;
+  clearProfileUpdated: () => void;
   endSession: () => Promise<void>;
 } | null>(null);
 
 export function SessionProvider({ children }: PropsWithChildren) {
   const [profile, setProfile] = useState<OperatorProfile | null>(null);
+  const [profileUpdated, setProfileUpdated] = useState(false);
 
   async function startSession(next: OperatorProfile) {
     try {
@@ -46,10 +50,28 @@ export function SessionProvider({ children }: PropsWithChildren) {
       // Unavailable device storage must not prevent use of the in-memory profile.
     }
     setProfile(next);
+    setProfileUpdated(false);
+  }
+
+  async function updateProfile(changes: Pick<OperatorProfile, 'nomeCompleto'>) {
+    if (!profile) throw new Error('Sessão não iniciada.');
+    const nomeCompleto = changes.nomeCompleto.trim().replace(/\s+/g, ' ');
+    if (nomeCompleto.length < 3) throw new Error('Informe um nome completo com pelo menos 3 caracteres.');
+    const next = { ...profile, nomeCompleto };
+    const raw = JSON.stringify(next);
+    if (Platform.OS === 'web') {
+      if (typeof window === 'undefined') throw new Error('Armazenamento indisponível.');
+      window.sessionStorage.setItem(PROFILE_KEY, raw);
+    } else {
+      await SecureStore.setItemAsync(PROFILE_KEY, raw);
+    }
+    setProfile(next);
+    setProfileUpdated(true);
   }
 
   async function endSession() {
     setProfile(null);
+    setProfileUpdated(false);
     try {
       // Retain the last profile for a later matching login; it is not a credential.
       if (Platform.OS !== 'web') await SecureStore.deleteItemAsync('cptm.keepConnectedUntil');
@@ -58,7 +80,7 @@ export function SessionProvider({ children }: PropsWithChildren) {
     }
   }
 
-  return <SessionContext.Provider value={{ profile, startSession, endSession }}>{children}</SessionContext.Provider>;
+  return <SessionContext.Provider value={{ profile, profileUpdated, startSession, updateProfile, clearProfileUpdated: () => setProfileUpdated(false), endSession }}>{children}</SessionContext.Provider>;
 }
 
 export function useSession() {

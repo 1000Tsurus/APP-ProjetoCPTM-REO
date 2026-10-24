@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useRouter } from 'expo-router';
+import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import {
@@ -7,7 +7,6 @@ import {
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useSession } from '@/contexts/SessionContext';
 
 type FuncaoOperacional = 'Pátio' | 'Linha' | 'Supervisão';
 type CredencialForm = {
@@ -30,8 +29,6 @@ const BASES: readonly string[] = [
 ];
 
 export default function CadastroScreen() {
-  const router = useRouter();
-  const { startSession } = useSession();
   const [nomeCompleto, setNomeCompleto] = useState<CredencialForm['nomeCompleto']>('');
   const [matriculaOuEmail, setMatriculaOuEmail] = useState<CredencialForm['matriculaOuEmail']>('');
   const [funcaoOperacional, setFuncaoOperacional] = useState<FuncaoOperacional>('Pátio');
@@ -75,11 +72,10 @@ export default function CadastroScreen() {
     try {
       const endpoint = process.env.EXPO_PUBLIC_CREDENTIALS_API_URL;
       if (!endpoint) {
-        await startSession({
-          nomeCompleto: nome, matriculaOuEmail: identificador,
-          funcaoOperacional, baseLotacao: base,
+        setFeedback({
+          kind: 'info',
+          text: 'Dados validados. Configure a URL da API para enviar a solicitação.',
         });
-        router.replace('/(tabs)');
         return;
       }
       // Chamada da API: substitua este fetch pelo cliente/endpoint de cadastro do seu backend.
@@ -90,11 +86,10 @@ export default function CadastroScreen() {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Falha ao solicitar cadastro.');
-      await startSession({
-        nomeCompleto: nome, matriculaOuEmail: identificador,
-        funcaoOperacional, baseLotacao: base,
+      setFeedback({
+        kind: 'success',
+        text: 'Solicitação enviada. Aguarde a aprovação da supervisão.',
       });
-      router.replace('/(tabs)');
     } catch {
       setFeedback({
         kind: 'error',
@@ -107,7 +102,7 @@ export default function CadastroScreen() {
 
   function voltar(): void {
     if (router.canGoBack()) router.back();
-    else router.replace('/login');
+    else router.replace('/');
   }
 
   return (
@@ -167,11 +162,9 @@ export default function CadastroScreen() {
                 <Ionicons name="shield-checkmark-outline" size={19} color="#e72727" />
               </View>
               <View style={styles.approvalCopy}>
-                <Text style={styles.approvalTitle}>Perfil operacional</Text>
+                <Text style={styles.approvalTitle}>Aprovação Obrigatória</Text>
                 <Text style={styles.approvalDescription}>
-                  {process.env.EXPO_PUBLIC_CREDENTIALS_API_URL
-                    ? 'O cadastro não substitui a liberação operacional da supervisão.'
-                    : 'Modo demonstrativo: conheça o painel com seu nome e sua base. Nenhuma credencial será enviada.'}
+                  O perfil passará pela liberação da supervisão antes do início da jornada.
                 </Text>
               </View>
             </View>
@@ -381,7 +374,7 @@ export default function CadastroScreen() {
 
             <View style={styles.footer}>
               <Text style={styles.footerQuestion}>Já possui credencial autorizada?</Text>
-              <Pressable onPress={() => router.replace('/login')} accessibilityRole="link">
+              <Pressable onPress={() => router.replace('/')} accessibilityRole="link">
                 <Text style={styles.footerLink}>Acessar o Terminal de Entrada</Text>
               </Pressable>
               <View style={styles.securityNote}>
