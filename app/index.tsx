@@ -283,7 +283,7 @@ export default function LoginScreen() {
 
           <View style={styles.requestAccess}>
             <Text style={styles.requestMuted}>Não possui credencial autorizada?</Text>
-            <Pressable>
+            <Pressable onPress={() => router.push('/cadastro')} accessibilityRole="link">
               <Text style={styles.requestLink}>Solicitar cadastro operacional ↗</Text>
             </Pressable>
           </View>
