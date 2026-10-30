@@ -2,7 +2,7 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View, type ScrollViewInstance } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { InspectionCard } from '@/components/operation/InspectionCard';
@@ -26,7 +26,7 @@ export default function HomeScreen() {
   const { open, request } = useLocalSearchParams<{ open?: string; request?: string }>();
   const { profile } = useSession();
   const insets = useSafeAreaInsets();
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const [filter, setFilter] = useState<Filter>('all');
   const [panel, setPanel] = useState<Panel>(null);
   const [category, setCategory] = useState<AnalysisCategory>('dormentes');

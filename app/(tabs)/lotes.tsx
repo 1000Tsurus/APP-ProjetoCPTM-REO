@@ -1,34 +1,16 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OperationPanel } from '@/components/operation/OperationPanel';
-import { useSession } from '@/contexts/SessionContext';
+import { finishLot, lotMetrics, readStore, startLot, type Lot } from '@/data/inspection-store';
 
-type LotStatus = 'inspection' | 'finished' | 'waiting';
-type Lot = {
-  id: string;
-  line: string;
-  supplier: string;
-  status: LotStatus;
-  total: number;
-  approved: number;
-  rejected: number;
-  inspector?: string;
-  finishedDate?: string;
-};
 type Filter = 'all' | 'inspection' | 'finished';
-type Panel = 'new' | 'inspection' | 'report' | 'export' | 'scan' | 'history' | 'settings' | null;
-
-const INITIAL_LOTS: Lot[] = [
-  { id: 'LT-002', line: 'Linha 4', supplier: 'Fornecedor Ipê Tratado', status: 'inspection', total: 300, approved: 180, rejected: 20, inspector: 'Eng. João Silva' },
-  { id: 'LT-001', line: 'Linha Principal', supplier: 'Fornecedor A (Madeiras ...', status: 'finished', total: 500, approved: 475, rejected: 25, finishedDate: '23/10' },
-  { id: 'LT-003', line: 'Terminal Norte', supplier: 'Fornecedor Eucalipto Real', status: 'waiting', total: 800, approved: 0, rejected: 0 },
-];
+type Panel = 'report' | 'export' | 'scan' | 'history' | 'settings' | null;
 
 const FILTERS: { key: Filter; label: string }[] = [
   { key: 'all', label: 'Todos' },
@@ -41,19 +23,20 @@ export default function LotsScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const compact = width < 420;
-  const { profile } = useSession();
-  const [lots, setLots] = useState(INITIAL_LOTS);
+  const [store, setStore] = useState<Awaited<ReturnType<typeof readStore>>>({ version: 1, lots: [], inspections: [], evidence: [] });
+  const [loadError, setLoadError] = useState('');
+  const lots = store.lots;
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [panel, setPanel] = useState<Panel>(null);
-  const [selectedId, setSelectedId] = useState('LT-002');
-  const [newLine, setNewLine] = useState('');
-  const [newSupplier, setNewSupplier] = useState('');
-  const [newQuantity, setNewQuantity] = useState('');
-  const [formError, setFormError] = useState('');
+  const [selectedId, setSelectedId] = useState('');
+
+  useFocusEffect(useCallback(() => { readStore().then((value) => { setStore(value); setLoadError(''); }).catch(() => setLoadError('Não foi possível carregar os lotes salvos.')); }, []));
 
   const selectedLot = lots.find((lot) => lot.id === selectedId);
   const totalUnits = lots.reduce((sum, lot) => sum + lot.total, 0);
+  const totalApproved = lots.reduce((sum, lot) => sum + lotMetrics(store, lot).approved, 0);
+  const totalClassified = lots.reduce((sum, lot) => { const metrics = lotMetrics(store, lot); return sum + metrics.approved + metrics.rejected; }, 0);
   const counts = {
     all: lots.length,
     inspection: lots.filter((lot) => lot.status === 'inspection').length,
@@ -62,7 +45,7 @@ export default function LotsScreen() {
   const query = search.trim().toLocaleLowerCase('pt-BR');
   const visibleLots = lots.filter((lot) =>
     (filter === 'all' || lot.status === filter) &&
-    (!query || `${lot.id} ${lot.line} ${lot.supplier}`.toLocaleLowerCase('pt-BR').includes(query))
+    (!query || `${lot.code} ${lot.line} ${lot.supplier}`.toLocaleLowerCase('pt-BR').includes(query))
   );
 
   function openLot(lot: Lot, nextPanel: Exclude<Panel, null>) {
@@ -70,45 +53,22 @@ export default function LotsScreen() {
     setPanel(nextPanel);
   }
 
-  function createLot() {
-    const quantity = Number(newQuantity);
-    if (!newLine.trim() || !newSupplier.trim() || !Number.isInteger(quantity) || quantity <= 0) {
-      setFormError('Informe a linha, o fornecedor e uma quantidade inteira maior que zero.');
-      return;
-    }
-    const nextNumber = Math.max(...lots.map((lot) => Number(lot.id.split('-')[1]) || 0)) + 1;
-    const id = `LT-${String(nextNumber).padStart(3, '0')}`;
-    setLots((current) => [...current, {
-      id, line: newLine.trim(), supplier: newSupplier.trim(), status: 'waiting',
-      total: quantity, approved: 0, rejected: 0,
-    }]);
-    setNewLine('');
-    setNewSupplier('');
-    setNewQuantity('');
-    setFormError('');
-    setFilter('all');
-    setSearch('');
-    setPanel(null);
+  async function startInspection(lot: Lot) {
+    try { await startLot(lot.id); setPanel(null); router.push({ pathname: '/inspecionar/[lotId]', params: { lotId: lot.id } }); }
+    catch (cause) { setLoadError(cause instanceof Error ? cause.message : 'Não foi possível iniciar o lote.'); }
   }
 
-  function startInspection(lot: Lot) {
-    setLots((current) => current.map((item) => item.id === lot.id
-      ? { ...item, status: 'inspection', inspector: item.inspector || profile?.nomeCompleto || 'Inspetor CPTM' }
-      : item));
-    openLot(lot, 'inspection');
+  function continueInspection(lot: Lot) {
+    setPanel(null); router.push({ pathname: '/inspecionar/[lotId]', params: { lotId: lot.id } });
   }
 
-  function registerApproval() {
-    if (!selectedLot) return;
-    setLots((current) => current.map((lot) => {
-      if (lot.id !== selectedLot.id) return lot;
-      const approved = Math.min(lot.total - lot.rejected, lot.approved + 1);
-      return { ...lot, approved, status: approved + lot.rejected >= lot.total ? 'finished' : 'inspection' };
-    }));
+  async function finalize(lot: Lot) {
+    const run = async () => { try { await finishLot(lot.id); setStore(await readStore()); } catch (cause) { setLoadError(cause instanceof Error ? cause.message : 'Não foi possível finalizar o lote.'); } };
+    if (Platform.OS === 'web') { if (window.confirm(`Finalizar o lote ${lot.code}?`)) await run(); }
+    else Alert.alert('Finalizar lote', `Finalizar o lote ${lot.code}?`, [{ text: 'Cancelar', style: 'cancel' }, { text: 'Finalizar', onPress: run }]);
   }
 
   const panelTitles: Record<Exclude<Panel, null>, string> = {
-    new: 'Novo Lote', inspection: selectedLot ? `Inspeção ${selectedLot.id}` : 'Inspeção',
     report: 'Relatório Final', export: 'Exportar PDF', scan: 'Selecionar lote',
     history: 'Histórico de lotes', settings: 'Ajustes',
   };
@@ -120,7 +80,7 @@ export default function LotsScreen() {
         <View style={styles.header}>
           <View style={styles.brandIcon}><MaterialCommunityIcons name="train" size={25} color="#fff" /></View>
           <View style={styles.brandCopy}><Text style={styles.brand}>RAILLOG INSPECT</Text><Text style={styles.pageTitle}>Lotes</Text></View>
-          <View style={styles.online}><View style={styles.onlineDot} /><Text style={styles.onlineText}>Online</Text></View>
+          <View style={styles.online}><View style={styles.onlineDot} /><Text style={styles.onlineText}>Local</Text></View>
           <Pressable accessibilityRole="button" accessibilityLabel="Abrir perfil" onPress={() => router.push('/(tabs)/perfil')} style={styles.avatar}>
             <Ionicons name="person-outline" size={19} color="#fff" />
           </Pressable>
@@ -133,7 +93,7 @@ export default function LotsScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
               <View style={styles.summaryHeading}><Text style={[styles.overline, compact && styles.overlineCompact]}>PAINEL OPERACIONAL</Text><Text style={[styles.summaryTitle, compact && styles.summaryTitleCompact]}>Gestão de Lotes</Text></View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Criar novo lote" onPress={() => { setFormError(''); setPanel('new'); }}
+              <Pressable accessibilityRole="button" accessibilityLabel="Criar novo lote" onPress={() => router.push('/cadastrar-lote')}
                 style={({ pressed }) => [styles.newButton, compact && styles.newButtonCompact, pressed && styles.pressed]}>
                 <Ionicons name="add" size={compact ? 19 : 23} color="#fff" /><Text style={[styles.newButtonText, compact && styles.newButtonTextCompact]}>Novo Lote</Text>
               </Pressable>
@@ -142,7 +102,7 @@ export default function LotsScreen() {
               <View style={styles.metric}><View style={styles.metricIcon}><MaterialCommunityIcons name="cube-scan" size={24} color="#17191b" /></View>
                 <View style={styles.metricCopy}><Text style={styles.metricValue}>{totalUnits.toLocaleString('pt-BR')}</Text><Text numberOfLines={1} style={styles.metricLabel}>Dormentes totais</Text></View></View>
               <View style={styles.metric}><View style={[styles.metricIcon, styles.metricIconRed]}><MaterialCommunityIcons name="check-decagram-outline" size={24} color="#27272a" /></View>
-                <View style={styles.metricCopy}><Text style={styles.metricValue}>91.2%</Text><Text numberOfLines={1} style={styles.metricLabel}>Conformidade geral</Text></View></View>
+                <View style={styles.metricCopy}><Text style={styles.metricValue}>{totalClassified ? `${Math.round(totalApproved / totalClassified * 100)}%` : '—'}</Text><Text numberOfLines={1} style={styles.metricLabel}>Aprovação classificada</Text></View></View>
             </View>
           </View>
 
@@ -159,44 +119,44 @@ export default function LotsScreen() {
             </Pressable>)}
           </ScrollView>
 
+          {!!loadError && <Text accessibilityRole="alert" style={styles.formError}>{loadError}</Text>}
           <View style={styles.lotList}>
             {visibleLots.length === 0 && <View style={styles.emptyCard}><Ionicons name="search-outline" size={28} color="#8d9395" />
               <Text style={styles.emptyText}>Nenhum lote encontrado.</Text></View>}
             {visibleLots.map((lot) => {
-              const processed = lot.approved + lot.rejected;
-              const pending = Math.max(0, lot.total - processed);
-              const progress = lot.total ? Math.round(processed / lot.total * 100) : 0;
+              const { completed: processed, approved, rejected, unclassified, pending, progress } = lotMetrics(store, lot);
               return <View key={lot.id} style={styles.lotCard}>
                 <View style={styles.lotHeading}>
-                  <View style={styles.lotIdentity}><View style={styles.lotTitleRow}><Text style={styles.lotId}>{lot.id}</Text><View style={[styles.lineDot, lot.status === 'inspection' && styles.lineDotRed]} /><Text numberOfLines={1} style={styles.lineName}>{lot.line}</Text></View>
+                  <View style={styles.lotIdentity}><View style={styles.lotTitleRow}><Text style={styles.lotId}>{lot.code}</Text><View style={[styles.lineDot, lot.status === 'inspection' && styles.lineDotRed]} /><Text numberOfLines={1} style={styles.lineName}>{lot.line}</Text></View>
                     <Text numberOfLines={1} style={styles.supplier}>{lot.supplier}</Text></View>
                   <View style={[styles.statusBadge, lot.status === 'inspection' ? styles.statusActive : styles.statusMuted]}>
                     {lot.status === 'finished' && <MaterialCommunityIcons name="check-all" size={15} color="#55595c" />}
                     <Text style={[styles.statusText, lot.status === 'inspection' && styles.statusTextActive]}>
-                      {lot.status === 'inspection' ? 'EM INSPEÇÃO' : lot.status === 'finished' ? `Concluído ${lot.finishedDate || ''}` : 'Aguardando'}
+                      {lot.status === 'inspection' ? 'EM INSPEÇÃO' : lot.status === 'finished' ? `Concluído ${lot.finishedAt ? new Date(lot.finishedAt).toLocaleDateString('pt-BR') : ''}` : 'Aguardando'}
                     </Text>
                   </View>
                 </View>
 
                 {lot.status === 'inspection' && <>
-                  <View style={styles.inspectorPill}><MaterialCommunityIcons name="account-hard-hat-outline" size={17} color="#4f5459" /><Text style={styles.inspectorName}>{lot.inspector}</Text></View>
+                  <View style={styles.inspectorPill}><MaterialCommunityIcons name="account-hard-hat-outline" size={17} color="#4f5459" /><Text style={styles.inspectorName}>{lot.operatorName}</Text></View>
                   <View style={styles.progressHeading}><Text style={styles.mutedText}>Progresso de Auditoria</Text><Text style={styles.progressCount}>{processed} / {lot.total} <Text style={styles.mutedText}>({progress}%)</Text></Text></View>
-                  <View accessibilityRole="progressbar" accessibilityLabel={`Progresso do lote ${lot.id}`} accessibilityValue={{ min: 0, max: 100, now: progress }} style={styles.progressTrack}>
+                  <View accessibilityRole="progressbar" accessibilityLabel={`Progresso do lote ${lot.code}`} accessibilityValue={{ min: 0, max: 100, now: progress }} style={styles.progressTrack}>
                     <View style={[styles.progressFill, { width: `${progress}%` }]} />
                   </View>
                   <View style={styles.statsWrap}>
-                    <View style={styles.statPill}><Ionicons name="checkmark-circle-outline" size={17} color="#25292c" /><Text style={styles.statNumber}>{lot.approved}</Text><Text style={styles.statLabel}>Aprovados</Text></View>
-                    <View style={styles.statPill}><Ionicons name="close-circle-outline" size={17} color="#ed2027" /><Text style={styles.statNumberRed}>{lot.rejected}</Text><Text style={styles.statLabel}>Reprovados</Text></View>
+                    <View style={styles.statPill}><Ionicons name="checkmark-circle-outline" size={17} color="#25292c" /><Text style={styles.statNumber}>{approved}</Text><Text style={styles.statLabel}>Aprovados</Text></View>
+                    <View style={styles.statPill}><Ionicons name="close-circle-outline" size={17} color="#ed2027" /><Text style={styles.statNumberRed}>{rejected}</Text><Text style={styles.statLabel}>Reprovados</Text></View>
+                    {unclassified > 0 && <View style={styles.statPill}><Text style={styles.statNumber}>{unclassified}</Text><Text style={styles.statLabel}>Sem classificação</Text></View>}
                     <View style={styles.statPill}><Ionicons name="hourglass-outline" size={17} color="#5d6366" /><Text style={styles.statNumber}>{pending}</Text><Text style={styles.statLabel}>Pendentes</Text></View>
                   </View>
-                  <Pressable accessibilityRole="button" onPress={() => openLot(lot, 'inspection')} style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}>
-                    <Text style={styles.primaryActionText}>Continuar Inspeção</Text><Ionicons name="arrow-forward" size={23} color="#fff" />
+                  <Pressable accessibilityRole="button" onPress={() => pending ? continueInspection(lot) : finalize(lot)} style={({ pressed }) => [styles.primaryAction, pressed && styles.pressed]}>
+                    <Text style={styles.primaryActionText}>{pending ? 'Continuar Inspeção' : 'Finalizar Lote'}</Text><Ionicons name="arrow-forward" size={23} color="#fff" />
                   </Pressable>
                 </>}
 
                 {lot.status === 'finished' && <>
-                  <View style={styles.completedMetrics}><View><Text style={styles.mutedText}>Auditoria Completa</Text><Text style={styles.completedValue}>{lot.total} / {lot.total}<Text style={styles.unit}> unid.</Text></Text></View>
-                    <View style={styles.completedRight}><Text style={styles.mutedText}>Conformidade</Text><Text style={styles.completedValue}>{Math.round(lot.approved / lot.total * 100)}% Aprov.</Text></View></View>
+                  <View style={styles.completedMetrics}><View><Text style={styles.mutedText}>Auditoria Completa</Text><Text style={styles.completedValue}>{processed} / {lot.total}<Text style={styles.unit}> unid.</Text></Text></View>
+                    <View style={styles.completedRight}><Text style={styles.mutedText}>Classificados</Text><Text style={styles.completedValue}>{approved + rejected}</Text></View></View>
                   <View style={styles.actionRow}>
                     <Pressable accessibilityRole="button" onPress={() => openLot(lot, 'report')} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}><MaterialCommunityIcons name="chart-box-outline" size={21} color="#212527" /><Text style={styles.secondaryActionText}>Relatório Final</Text></Pressable>
                     <Pressable accessibilityRole="button" onPress={() => openLot(lot, 'export')} style={({ pressed }) => [styles.secondaryAction, pressed && styles.pressed]}><MaterialCommunityIcons name="file-pdf-box" size={21} color="#212527" /><Text style={styles.secondaryActionText}>Exportar PDF</Text></Pressable>
@@ -227,34 +187,19 @@ export default function LotsScreen() {
       </View>
 
       <OperationPanel title={panel ? panelTitles[panel] : ''} visible={panel !== null} onClose={() => setPanel(null)}>
-        {panel === 'new' && <>
-          <Text style={styles.panelDescription}>Cadastre um lote para acompanhar a inspeção.</Text>
-          <Text style={styles.fieldLabel}>Linha ou local</Text><TextInput value={newLine} onChangeText={setNewLine} placeholder="Ex.: Linha 4" placeholderTextColor="#93999b" style={styles.formInput} />
-          <Text style={styles.fieldLabel}>Fornecedor</Text><TextInput value={newSupplier} onChangeText={setNewSupplier} placeholder="Nome do fornecedor" placeholderTextColor="#93999b" style={styles.formInput} />
-          <Text style={styles.fieldLabel}>Quantidade de unidades</Text><TextInput value={newQuantity} onChangeText={setNewQuantity} keyboardType="number-pad" placeholder="Ex.: 300" placeholderTextColor="#93999b" style={styles.formInput} />
-          {!!formError && <Text accessibilityRole="alert" style={styles.formError}>{formError}</Text>}
-          <Pressable accessibilityRole="button" onPress={createLot} style={styles.panelButton}><Text style={styles.panelButtonText}>Criar lote</Text></Pressable>
-        </>}
-        {panel === 'inspection' && selectedLot && <>
-          <Text style={styles.panelDescription}>{selectedLot.line} • {selectedLot.supplier}</Text>
-          <View style={styles.panelStat}><Text style={styles.panelStatNumber}>{selectedLot.approved + selectedLot.rejected} / {selectedLot.total}</Text><Text style={styles.mutedText}>unidades auditadas</Text></View>
-          <Text style={styles.panelDescription}>Aprovados: {selectedLot.approved}  •  Reprovados: {selectedLot.rejected}  •  Pendentes: {Math.max(0, selectedLot.total - selectedLot.approved - selectedLot.rejected)}</Text>
-          {selectedLot.status !== 'finished' && <Pressable accessibilityRole="button" onPress={registerApproval} style={styles.panelButton}><Text style={styles.panelButtonText}>Simular aprovação de 1 unidade</Text></Pressable>}
-          <Text style={styles.panelHint}>Esta ação atualiza apenas os dados locais desta demonstração.</Text>
-        </>}
         {panel === 'report' && selectedLot && <>
-          <View style={styles.panelStat}><Text style={styles.panelStatNumber}>{selectedLot.id}</Text><Text style={styles.mutedText}>{selectedLot.line}</Text></View>
-          <Text style={styles.panelDescription}>Auditoria completa: {selectedLot.total} unidades.</Text>
-          <Text style={styles.panelDescription}>Aprovados: {selectedLot.approved}  •  Reprovados: {selectedLot.rejected}</Text>
-          <Text style={styles.panelDescription}>Conformidade: {Math.round(selectedLot.approved / selectedLot.total * 100)}%.</Text>
+          <View style={styles.panelStat}><Text style={styles.panelStatNumber}>{selectedLot.code}</Text><Text style={styles.mutedText}>{selectedLot.line}</Text></View>
+          <Text style={styles.panelDescription}>Inspeções concluídas: {lotMetrics(store, selectedLot).completed} de {selectedLot.total}.</Text>
+          <Text style={styles.panelDescription}>Aprovados: {lotMetrics(store, selectedLot).approved}  •  Reprovados: {lotMetrics(store, selectedLot).rejected}  •  Sem classificação: {lotMetrics(store, selectedLot).unclassified}</Text>
+          <Text style={styles.panelDescription}>Este resumo usa os registros salvos neste dispositivo.</Text>
         </>}
-        {panel === 'export' && selectedLot && <><Text style={styles.panelDescription}>O relatório de {selectedLot.id} está pronto para consulta nesta tela.</Text><Text style={styles.panelHint}>A geração do arquivo PDF depende da integração com o serviço de relatórios.</Text></>}
+        {panel === 'export' && selectedLot && <><Text style={styles.panelDescription}>Lote {selectedLot.code}: {lotMetrics(store, selectedLot).completed} inspeções concluídas.</Text><Text style={styles.panelHint}>A exportação em PDF depende da integração com o serviço de relatórios, ainda indisponível neste projeto.</Text></>}
         {panel === 'scan' && <><Text style={styles.panelDescription}>Selecione um lote para iniciar ou continuar a inspeção.</Text>
-          {lots.filter((lot) => lot.status !== 'finished').map((lot) => <Pressable key={lot.id} accessibilityRole="button" onPress={() => lot.status === 'waiting' ? startInspection(lot) : openLot(lot, 'inspection')} style={styles.panelListItem}>
-            <Ionicons name="layers-outline" size={23} color="#303636" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>{lot.id}</Text><Text style={styles.mutedText}>{lot.line}</Text></View><Ionicons name="chevron-forward" size={18} color="#64696b" /></Pressable>)}
+          {lots.filter((lot) => lot.status !== 'finished').map((lot) => <Pressable key={lot.id} accessibilityRole="button" onPress={() => lot.status === 'waiting' ? startInspection(lot) : lotMetrics(store, lot).pending ? continueInspection(lot) : finalize(lot)} style={styles.panelListItem}>
+            <Ionicons name="layers-outline" size={23} color="#303636" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>{lot.code}</Text><Text style={styles.mutedText}>{lot.line}</Text></View><Ionicons name="chevron-forward" size={18} color="#64696b" /></Pressable>)}
         </>}
-        {panel === 'history' && <><Text style={styles.panelDescription}>Lotes concluídos e em andamento neste dispositivo.</Text>{lots.filter((lot) => lot.status !== 'waiting').map((lot) => <Pressable key={lot.id} accessibilityRole="button" onPress={() => openLot(lot, lot.status === 'finished' ? 'report' : 'inspection')} style={styles.panelListItem}><Ionicons name={lot.status === 'finished' ? 'checkmark-circle-outline' : 'time-outline'} size={23} color="#303636" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>{lot.id}</Text><Text style={styles.mutedText}>{lot.status === 'finished' ? 'Concluído' : 'Em inspeção'}</Text></View><Ionicons name="chevron-forward" size={18} color="#64696b" /></Pressable>)}</>}
-        {panel === 'settings' && <><Text style={styles.panelDescription}>RailLog Inspect</Text><View style={styles.panelListItem}><Ionicons name="cloud-done-outline" size={23} color="#09b983" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>Conexão online</Text><Text style={styles.mutedText}>Dados demonstrativos locais</Text></View></View></>}
+        {panel === 'history' && <><Text style={styles.panelDescription}>Lotes concluídos e em andamento neste dispositivo.</Text>{lots.filter((lot) => lot.status !== 'waiting').map((lot) => <Pressable key={lot.id} accessibilityRole="button" onPress={() => lot.status === 'finished' ? openLot(lot, 'report') : continueInspection(lot)} style={styles.panelListItem}><Ionicons name={lot.status === 'finished' ? 'checkmark-circle-outline' : 'time-outline'} size={23} color="#303636" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>{lot.code}</Text><Text style={styles.mutedText}>{lot.status === 'finished' ? 'Concluído' : 'Em inspeção'}</Text></View><Ionicons name="chevron-forward" size={18} color="#64696b" /></Pressable>)}</>}
+        {panel === 'settings' && <><Text style={styles.panelDescription}>RailLog Inspect</Text><View style={styles.panelListItem}><Ionicons name="save-outline" size={23} color="#55595c" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>Dados locais</Text><Text style={styles.mutedText}>Inspeções e fotos permanecem neste dispositivo.</Text></View></View></>}
       </OperationPanel>
     </SafeAreaView>
   );
@@ -268,7 +213,7 @@ const styles = StyleSheet.create({
   brandCopy: { flex: 1 }, brand: { color: '#565960', fontSize: 14, fontWeight: '600', letterSpacing: 0.5 },
   pageTitle: { color: '#101113', fontSize: 24, fontWeight: '500', lineHeight: 27 },
   online: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#f6f7f8', borderRadius: 18, paddingHorizontal: 9, paddingVertical: 7 },
-  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#08b983' }, onlineText: { color: '#61636a', fontSize: 14 },
+  onlineDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: '#73797c' }, onlineText: { color: '#61636a', fontSize: 14 },
   avatar: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#bc0019', alignItems: 'center', justifyContent: 'center' },
   scrollContent: { alignItems: 'center', paddingHorizontal: 25 }, content: { width: '100%', maxWidth: 450 },
   summaryCard: { backgroundColor: '#fff', borderRadius: 38, paddingHorizontal: 20, paddingTop: 20, paddingBottom: 20, shadowColor: '#a9adb0', shadowOffset: { width: 0, height: 9 }, shadowOpacity: 0.07, shadowRadius: 24, elevation: 2 },

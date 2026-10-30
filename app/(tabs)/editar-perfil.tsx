@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { useNavigation, useRouter } from 'expo-router';
+import { usePreventRemove, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -11,7 +11,6 @@ const RED = '#d71d29';
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
   const { profile, updateProfile } = useSession();
   const [name, setName] = useState(profile?.nomeCompleto ?? '');
@@ -20,25 +19,15 @@ export default function EditProfileScreen() {
   const allowLeave = useRef(false);
   const dirty = name !== (profile?.nomeCompleto ?? '');
 
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('beforeRemove', (event) => {
-      if (!dirty || allowLeave.current) return;
-      event.preventDefault();
-      const discard = () => {
-        allowLeave.current = true;
-        navigation.dispatch(event.data.action);
-      };
-      if (Platform.OS === 'web') {
-        if (window.confirm('Descartar as alterações não salvas?')) discard();
-      } else {
-        Alert.alert('Alterações não salvas', 'Deseja descartar as alterações?', [
-          { text: 'Continuar editando', style: 'cancel' },
-          { text: 'Descartar', style: 'destructive', onPress: discard },
-        ]);
-      }
-    });
-    return unsubscribe;
-  }, [dirty, navigation]);
+  usePreventRemove(dirty && !allowLeave.current, ({ repeat }) => {
+    const discard = () => { allowLeave.current = true; repeat(); };
+    if (Platform.OS === 'web') {
+      if (window.confirm('Descartar as alterações não salvas?')) discard();
+    } else Alert.alert('Alterações não salvas', 'Deseja descartar as alterações?', [
+      { text: 'Continuar editando', style: 'cancel' },
+      { text: 'Descartar', style: 'destructive', onPress: discard },
+    ]);
+  });
 
   useEffect(() => {
     if (Platform.OS !== 'web' || !dirty) return;

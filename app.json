@@ -41,6 +41,10 @@
         }
       ],
       "expo-secure-store"
+      ,[
+        "expo-camera",
+        { "cameraPermission": "Permitir que o RailLog Inspect capture fotografias das inspeções de dormentes.", "recordAudioAndroid": false }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
