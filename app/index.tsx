@@ -3,6 +3,7 @@ import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
 import { findOperatorProfile, useSession } from '@/contexts/SessionContext';
+import { backendConfigured } from '@/data/access-service';
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -44,7 +45,9 @@ async function deleteSecureItem(key: string) {
 
 export default function LoginScreen() {
   const router = useRouter();
-  const { startSession } = useSession();
+  const { startSession, signIn: authenticateSession } = useSession();
+  const [feedback, setFeedback] = useState('');
+  const [signingIn, setSigningIn] = useState(false);
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [keepConnected, setKeepConnected] = useState(false);
@@ -95,20 +98,19 @@ export default function LoginScreen() {
   }
 
   async function signIn() {
-    if (!identifier.trim() || !password.trim()) {
-      Alert.alert('Acesso incompleto', 'Informe matrícula/e-mail e senha para continuar.');
+    if (signingIn) return;
+    if (!identifier.trim() || (backendConfigured && !password.trim())) {
+      setFeedback(backendConfigured ? 'Informe matrícula/e-mail e senha.' : 'Informe matrícula/e-mail para identificar o trabalho local.');
       return;
     }
-
-    const savedProfile = await findOperatorProfile(identifier);
-    await startSession(savedProfile ?? {
-      nomeCompleto: '', matriculaOuEmail: identifier.trim(),
-      funcaoOperacional: '', baseLotacao: '',
-    });
-    router.replace('/(tabs)');
+    setSigningIn(true); setFeedback('');
+    try { await authenticateSession(identifier, password); setPassword(''); router.replace('/(tabs)'); }
+    catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Não foi possível entrar.'); }
+    finally { setSigningIn(false); }
   }
 
   async function signInWithBiometrics() {
+    if (backendConfigured) { setFeedback('Biometria não substitui a autenticação do servidor. Entre com sua credencial aprovada.'); return; }
     try {
       setIsBiometricLoading(true);
       const compatible = await LocalAuthentication.hasHardwareAsync();
@@ -138,7 +140,7 @@ export default function LoginScreen() {
         await startSession(savedProfile);
         router.replace('/(tabs)');
       }
-    } finally {
+    } catch { setFeedback('Não foi possível validar a biometria neste aparelho.'); } finally {
       setIsBiometricLoading(false);
     }
   }
@@ -191,6 +193,9 @@ export default function LoginScreen() {
           <View style={styles.card}>
             <Text style={styles.title}>Bem-vindo de volta</Text>
             <Text style={styles.subtitle}>Operação e Manutenção Ferroviária</Text>
+            <Text style={styles.subtitle}>{backendConfigured ? 'Acesso sujeito à aprovação e autorização do servidor.' : 'Modo local: sem autenticação real. A senha não é validada nem salva. Aprovações, notificações remotas e criação de lotes exigem backend.'}</Text>
+            {backendConfigured && <Text style={styles.subtitle}>A sessão autenticada termina ao fechar o aplicativo. “Manter conectado” ainda guarda somente uma preferência local.</Text>}
+            {!!feedback && <Text accessibilityRole="alert" style={styles.subtitle}>{feedback}</Text>}
 
             <View style={styles.fieldBlock}>
               <Text style={styles.label}>Matrícula ou E-mail</Text>
@@ -258,12 +263,12 @@ export default function LoginScreen() {
 
               <View style={styles.sslRow}>
                 <Text style={styles.shieldIcon}>◇</Text>
-                <Text style={styles.sslText}>SSL Seguro</Text>
+                <Text style={styles.sslText}>{backendConfigured ? 'API HTTPS' : 'Dados locais'}</Text>
               </View>
             </View>
 
-            <Pressable onPress={signIn} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
-              <Text style={styles.primaryButtonText}>Entrar no Sistema</Text>
+            <Pressable disabled={signingIn} onPress={signIn} style={({ pressed }) => [styles.primaryButton, pressed && styles.pressed]}>
+              <Text style={styles.primaryButtonText}>{signingIn ? 'Verificando...' : backendConfigured ? 'Entrar no Sistema' : 'Continuar em modo local'}</Text>
               <Text style={styles.arrowIcon}>→</Text>
             </Pressable>
 

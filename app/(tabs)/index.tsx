@@ -7,6 +7,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { InspectionCard } from '@/components/operation/InspectionCard';
 import { OperationPanel } from '@/components/operation/OperationPanel';
+import { ScanActions } from '@/components/operation/ScanActions';
+import { ManagerInbox } from '@/components/operation/ManagerInbox';
 import { useSession } from '@/contexts/SessionContext';
 import {
   analysisCategories, operationalGoal, recentInspections, volumeSummary,
@@ -58,7 +60,7 @@ export default function HomeScreen() {
   }
 
   const panelTitles: Record<Exclude<Panel, null>, string> = {
-    categories: 'Categorias de análise', scan: 'Iniciar inspeção', lots: 'Lotes da operação',
+    categories: 'Categorias de análise', scan: 'Ler etiqueta', lots: 'Lotes da operação',
     history: 'Histórico de inspeções', calibration: 'Sensor LiDAR',
     inspection: 'Detalhes da inspeção', category: currentCategory.title,
   };
@@ -120,6 +122,7 @@ export default function HomeScreen() {
             </Pressable>
             <View style={styles.goalOwner}><Ionicons name="shield-checkmark-outline" size={10} color="#c1c4c4" /><Text style={styles.goalOwnerText}>Definida pela gestão • Somente leitura</Text></View>
           </View>
+          <ManagerInbox />
 
           <View style={styles.sectionHeading}><Text style={styles.overline}>CATEGORIAS DE ANÁLISE</Text>
             <Pressable accessibilityRole="button" onPress={() => setPanel('categories')} hitSlop={10}><Text style={styles.link}>Ver todas</Text></Pressable></View>
@@ -158,16 +161,16 @@ export default function HomeScreen() {
         <View style={styles.navigation}>
           <Pressable accessibilityRole="button" accessibilityLabel="Início" accessibilityState={{ selected: panel === null }} onPress={() => { setPanel(null); scrollRef.current?.scrollTo({ y: 0, animated: true }); }} style={styles.navItem}><Ionicons name="grid-outline" size={21} color="#fff" /><Text style={styles.navLabel}>Início</Text></Pressable>
           <Pressable accessibilityRole="button" onPress={() => router.navigate('/(tabs)/lotes')} style={styles.navItem}><Ionicons name="layers-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Lotes</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Nova inspeção" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={28} color="#fff" /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ler QR Code ou NFC" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={28} color="#fff" /></Pressable>
           <Pressable accessibilityRole="button" onPress={() => setPanel('history')} style={styles.navItem}><Ionicons name="time-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Perfil" onPress={() => router.navigate('/(tabs)/perfil')} style={styles.navItem}><Ionicons name="person-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Perfil</Text></Pressable>
         </View>
       </View>
 
       <OperationPanel title={panel ? panelTitles[panel] : ''} visible={panel !== null} onClose={() => setPanel(null)}>
-        {(panel === 'categories' || panel === 'scan') && <>
-          <Text style={styles.panelDescription}>{panel === 'scan' ? 'Selecione o elemento da via permanente que deseja inspecionar.' : 'Análises da via permanente para a operação CPTM.'}</Text>{categoryGrid()}
-          {panel === 'scan' && <Text style={styles.panelHint}>A captura será disponibilizada após a integração do sensor e do serviço de inspeções.</Text>}
+        {panel === 'scan' && <ScanActions onChoose={() => setPanel(null)} />}
+        {panel === 'categories' && <>
+          <Text style={styles.panelDescription}>Análises da via permanente para a operação CPTM.</Text>{categoryGrid()}
         </>}
         {panel === 'category' && <>
           <View style={styles.panelIcon}><Ionicons name={currentCategory.icon} size={30} color="#e52329" /></View>

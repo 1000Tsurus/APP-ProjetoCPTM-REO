@@ -2,7 +2,7 @@ import Ionicons from '@expo/vector-icons/Ionicons';
 import Slider from '@react-native-community/slider';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import { useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
+import { Redirect, useLocalSearchParams, usePreventRemove, useRouter } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, Image, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -11,15 +11,16 @@ import { useSession } from '@/contexts/SessionContext';
 import { completeInspection, diagnosisMissing, getOrCreateCurrentInspection, PHOTO_CATEGORIES, readStore, saveDiagnosis, saveEvidence,
   type Evidence, type Evaluation, type Inspection, type Lot, type Material, type PhotoCategory } from '@/data/inspection-store';
 import { persistPhoto, removePhoto, resolvePhoto } from '@/data/photo-storage';
+import { authorizeLot } from '@/data/access-service';
 
 const MATERIALS: Material[] = ['Ipê', 'Aroeira', 'Eucalipto', 'Concreto'];
 type Draft = Pick<Inspection, 'material' | 'condition' | 'cracks' | 'humidity' | 'residualYears'>;
 const draftOf = (item: Inspection): Draft => ({ material: item.material, condition: item.condition, cracks: item.cracks, humidity: item.humidity, residualYears: item.residualYears });
 
 export default function InspectScreen() {
-  const { lotId } = useLocalSearchParams<{ lotId: string }>();
+  const { lotId, inspectionId } = useLocalSearchParams<{ lotId: string; inspectionId?: string }>();
   const router = useRouter();
-  const { profile } = useSession();
+  const { profile, mode } = useSession();
   const { width } = useWindowDimensions();
   const [lot, setLot] = useState<Lot | null>(null);
   const [inspection, setInspection] = useState<Inspection | null>(null);
@@ -45,7 +46,10 @@ export default function InspectScreen() {
 
   const refresh = useCallback(async () => {
     if (!lotId || !profile) return;
-    const current = await getOrCreateCurrentInspection(lotId, profile.matriculaOuEmail);
+    await authorizeLot(lotId, 'inspect');
+    const existing = inspectionId ? (await readStore()).inspections.find((item) => item.id === inspectionId && item.lotId === lotId && item.status === 'in_progress') : undefined;
+    if (inspectionId && !existing) throw new Error('Esta inspeção está concluída ou não está disponível. Abra o histórico do dormente.');
+    const current = existing || await getOrCreateCurrentInspection(lotId, profile.matriculaOuEmail);
     const store = await readStore();
     setLot(store.lots.find((item) => item.id === lotId) || null);
     setInspection(current);
@@ -61,7 +65,7 @@ export default function InspectScreen() {
       if (uri) resolved[photo.category] = uri;
     }
     setPhotoUris(resolved);
-  }, [lotId, profile]);
+  }, [lotId, profile, inspectionId]);
 
   useEffect(() => { refresh().catch((cause) => setError(cause instanceof Error ? cause.message : 'Não foi possível abrir a inspeção.')); }, [refresh]);
   useEffect(() => () => { if (saveTimer.current) clearTimeout(saveTimer.current); }, []);
@@ -148,8 +152,13 @@ export default function InspectScreen() {
       try {
         await flush('photos');
         await completeInspection(inspection.id, evaluation);
+        if (inspectionId) {
+          disablePrevention();
+          router.replace({ pathname: '/dormente/[sleeperId]', params: { sleeperId: inspection.sleeperId } });
+          return;
+        }
         const store = await readStore();
-        const completed = store.inspections.filter((item) => item.lotId === lotId && item.status === 'completed').length;
+        const completed = new Set(store.inspections.filter((item) => item.lotId === lotId && item.status === 'completed').map((item) => item.sleeperId)).size;
         if (lot && completed < lot.total) {
           if (Platform.OS === 'web') window.alert('Inspeção concluída. O próximo dormente está disponível.');
           else Alert.alert('Inspeção concluída', 'O próximo dormente está disponível.');
@@ -173,11 +182,14 @@ export default function InspectScreen() {
   }
 
   const filled = draft ? [draft.material, draft.condition, draft.cracks, draft.humidity, draft.residualYears].filter((value) => value !== null).length + PHOTO_CATEGORIES.filter((item) => !!photoUris[item.id]).length : 0;
+  if (!profile) return <Redirect href="/login" />;
   if (!lot || !inspection || !draft) return <SafeAreaView style={styles.screen}><View style={styles.center}><Text>{error || 'Carregando inspeção...'}</Text><Pressable onPress={() => router.replace('/(tabs)/lotes')}><Text style={styles.link}>Voltar aos lotes</Text></Pressable></View></SafeAreaView>;
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Voltar e salvar rascunho" onPress={leave} style={styles.back}><Ionicons name="arrow-back" size={23} color="#22272a" /></Pressable><View><Text style={styles.title}>Inspecionar</Text><Text style={styles.subtitle}>{lot.code} · {inspection.sleeperId}</Text></View></View>
     <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.content}>
+      <Text style={styles.hint}>{mode === 'local' ? 'Inspeção local: diagnóstico e fotos ficam neste aparelho.' : 'Rascunho local desta conta. A sincronização do diagnóstico e das fotos com o servidor ainda não está integrada.'}</Text>
+      {inspection.kind === 'occurrence' && <Text style={styles.critical}>Nova ocorrência em dormente com registro anterior ou lote finalizado. O lote de origem {lot.code}, o histórico e as fotos anteriores serão preservados.</Text>}
       <View style={styles.identity}><View style={styles.rowBetween}><View><Text style={styles.overline}>DORMENTE {inspection.sleeperNumber} DE {lot.total}</Text><Text style={styles.sleeper}>{inspection.sleeperId}</Text></View><View style={styles.badge}><Text style={styles.badgeText}>{step === 'diagnosis' ? 'Diagnóstico' : 'Evidências'}</Text></View></View>
         <Text style={styles.muted}>{lot.line} · {lot.location}</Text><Text style={styles.muted}>Preenchimento: {Math.round(filled / 9 * 100)}%</Text><View style={styles.track}><View style={[styles.fill, { width: `${filled / 9 * 100}%` }]} /></View></View>
       <View style={styles.tabs}><Pressable onPress={() => setStep('diagnosis')} style={[styles.tab, step === 'diagnosis' && styles.tabActive]}><Text style={[styles.tabText, step === 'diagnosis' && styles.tabTextActive]}>1. Diagnóstico</Text></Pressable><Pressable onPress={goPhotos} style={[styles.tab, step === 'photos' && styles.tabActive]}><Text style={[styles.tabText, step === 'photos' && styles.tabTextActive]}>2. Fotografias</Text></Pressable></View>

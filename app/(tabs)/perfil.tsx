@@ -12,7 +12,7 @@ const RED = '#c80e28';
 export default function ProfileScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { profile, profileUpdated, clearProfileUpdated, endSession } = useSession();
+  const { profile, profileUpdated, clearProfileUpdated, endSession, canManage, mode } = useSession();
   const [leaving, setLeaving] = useState(false);
 
   async function signOut() {
@@ -38,10 +38,10 @@ export default function ProfileScreen() {
               <Ionicons name="arrow-back" size={23} color="#252c2d" />
             </Pressable>
             <Text accessibilityRole="header" style={styles.title}>Meu Perfil</Text>
-            <View style={styles.sessionBadge}><View style={styles.sessionDot} /><Text style={styles.sessionText}>Sessão ativa</Text></View>
+            <View style={styles.sessionBadge}><View style={styles.sessionDot} /><Text style={styles.sessionText}>{mode === 'local' ? 'Modo local' : canManage ? 'Gerente' : 'Operador'}</Text></View>
           </View>
 
-          {profileUpdated && <View accessibilityRole="alert" style={styles.success}><Ionicons name="checkmark-circle-outline" size={18} color="#237451" /><Text style={styles.successText}>Perfil atualizado neste dispositivo.</Text></View>}
+          {profileUpdated && <View accessibilityRole="alert" style={styles.success}><Ionicons name="checkmark-circle-outline" size={18} color="#237451" /><Text style={styles.successText}>{mode === 'local' ? 'Perfil atualizado neste dispositivo.' : 'Nome atualizado com confirmação do servidor.'}</Text></View>}
 
           <View style={styles.identityCard}>
             <View style={styles.identityTop}>
@@ -59,6 +59,8 @@ export default function ProfileScreen() {
             <View style={styles.fieldIcon}><Ionicons name={icon} size={22} color="#4d5557" /></View>
             <View style={styles.fieldCopy}><Text style={styles.fieldTitle}>{title}</Text><Text style={styles.fieldLabel}>{label}</Text><Text style={styles.fieldValue}>{value || 'Não informado'}</Text></View>
           </View>)}
+          <Text style={styles.fieldLabel}>{mode === 'local' ? 'Perfil local, sem autenticação real. Função técnica declarada não concede privilégios de gerente. Não há aprovação segura nem notificação remota.' : 'Permissões verificadas pelo servidor. Notificação remota e sincronização das inspeções ainda não integradas.'}</Text>
+          {(canManage || mode === 'local') && <Pressable accessibilityRole="button" onPress={() => router.push('/operadores')} style={styles.signOut}><Ionicons name="people-outline" size={22} color={RED} /><Text style={styles.signOutText}>{canManage ? 'Gerir operadores e solicitações' : 'Consultar solicitações locais'}</Text></Pressable>}
 
           <Pressable accessibilityRole="button" accessibilityLabel="Sair da conta" accessibilityState={{ disabled: leaving }} disabled={leaving} onPress={() => void signOut()} style={({ pressed }) => [styles.signOut, pressed && styles.pressed]}>
             <Ionicons name="log-out-outline" size={21} color={RED} /><Text style={styles.signOutText}>{leaving ? 'Saindo...' : 'Sair da conta'}</Text>
@@ -70,7 +72,7 @@ export default function ProfileScreen() {
         <View style={styles.navigation}>
           <Pressable accessibilityRole="button" accessibilityLabel="Início" onPress={() => router.navigate('/(tabs)')} style={styles.navItem}><Ionicons name="grid-outline" size={21} color="#c7cdcd" /><Text style={styles.navLabel}>Início</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Lotes" onPress={() => router.navigate('/(tabs)/lotes')} style={styles.navItem}><Ionicons name="layers-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Lotes</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Nova inspeção" onPress={() => router.navigate({ pathname: '/(tabs)', params: { open: 'scan', request: String(Date.now()) } })} style={styles.navScan}><Ionicons name="qr-code-outline" size={27} color="#fff" /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ler QR Code ou NFC" onPress={() => router.navigate({ pathname: '/(tabs)', params: { open: 'scan', request: String(Date.now()) } })} style={styles.navScan}><Ionicons name="qr-code-outline" size={27} color="#fff" /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Histórico" onPress={() => router.navigate({ pathname: '/(tabs)', params: { open: 'history', request: String(Date.now()) } })} style={styles.navItem}><Ionicons name="time-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
           <View accessibilityRole="tab" accessibilityState={{ selected: true }} style={[styles.navItem, styles.navSelected]}><Ionicons name="person-outline" size={22} color="#fff" /><Text style={styles.navSelectedText}>Perfil</Text></View>
         </View>

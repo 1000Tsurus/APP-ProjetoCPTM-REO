@@ -7,7 +7,9 @@ import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, us
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { OperationPanel } from '@/components/operation/OperationPanel';
-import { finishLot, lotMetrics, readStore, startLot, type Lot } from '@/data/inspection-store';
+import { ScanActions } from '@/components/operation/ScanActions';
+import { useSession } from '@/contexts/SessionContext';
+import { finishLot, lotMetrics, loadOperationalStore, readStore, startLot, type Lot } from '@/data/inspection-store';
 
 type Filter = 'all' | 'inspection' | 'finished';
 type Panel = 'report' | 'export' | 'scan' | 'history' | 'settings' | null;
@@ -20,6 +22,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 export default function LotsScreen() {
   const router = useRouter();
+  const { canManage, mode, profile } = useSession();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const compact = width < 420;
@@ -31,7 +34,12 @@ export default function LotsScreen() {
   const [panel, setPanel] = useState<Panel>(null);
   const [selectedId, setSelectedId] = useState('');
 
-  useFocusEffect(useCallback(() => { readStore().then((value) => { setStore(value); setLoadError(''); }).catch(() => setLoadError('Não foi possível carregar os lotes salvos.')); }, []));
+  useFocusEffect(useCallback(() => {
+    let alive = true;
+    setStore({ version: 1, lots: [], inspections: [], evidence: [] });
+    loadOperationalStore().then((value) => { if (alive) { setStore(value); setLoadError(''); } }).catch((cause) => { if (alive) setLoadError(cause instanceof Error ? cause.message : 'Não foi possível carregar os lotes salvos.'); });
+    return () => { alive = false; };
+  }, [profile]));
 
   const selectedLot = lots.find((lot) => lot.id === selectedId);
   const totalUnits = lots.reduce((sum, lot) => sum + lot.total, 0);
@@ -69,7 +77,7 @@ export default function LotsScreen() {
   }
 
   const panelTitles: Record<Exclude<Panel, null>, string> = {
-    report: 'Relatório Final', export: 'Exportar PDF', scan: 'Selecionar lote',
+    report: 'Relatório Final', export: 'Exportar PDF', scan: 'Ler etiqueta',
     history: 'Histórico de lotes', settings: 'Ajustes',
   };
 
@@ -93,10 +101,10 @@ export default function LotsScreen() {
           <View style={styles.summaryCard}>
             <View style={styles.summaryTop}>
               <View style={styles.summaryHeading}><Text style={[styles.overline, compact && styles.overlineCompact]}>PAINEL OPERACIONAL</Text><Text style={[styles.summaryTitle, compact && styles.summaryTitleCompact]}>Gestão de Lotes</Text></View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Criar novo lote" onPress={() => router.push('/cadastrar-lote')}
+              {canManage && <Pressable accessibilityRole="button" accessibilityLabel="Criar novo lote" onPress={() => router.push('/cadastrar-lote')}
                 style={({ pressed }) => [styles.newButton, compact && styles.newButtonCompact, pressed && styles.pressed]}>
                 <Ionicons name="add" size={compact ? 19 : 23} color="#fff" /><Text style={[styles.newButtonText, compact && styles.newButtonTextCompact]}>Novo Lote</Text>
-              </Pressable>
+              </Pressable>}
             </View>
             <View style={styles.metrics}>
               <View style={styles.metric}><View style={styles.metricIcon}><MaterialCommunityIcons name="cube-scan" size={24} color="#17191b" /></View>
@@ -105,6 +113,9 @@ export default function LotsScreen() {
                 <View style={styles.metricCopy}><Text style={styles.metricValue}>{totalClassified ? `${Math.round(totalApproved / totalClassified * 100)}%` : '—'}</Text><Text numberOfLines={1} style={styles.metricLabel}>Aprovação classificada</Text></View></View>
             </View>
           </View>
+
+          {mode === 'local' && <Text style={styles.panelHint}>Modo local: lotes e inspeções deste aparelho, sem controle de acesso seguro. Criar lotes exige gerente autenticado no backend. Aprovações e notificações remotas não estão integradas.</Text>}
+          {mode === 'backend' && <Text style={styles.panelHint}>Lotes autorizados pelo servidor. Diagnósticos e fotos ficam locais nesta conta; sincronização de inspeções ainda não integrada.</Text>}
 
           <View style={styles.searchBox}><Ionicons name="search" size={22} color="#55595e" />
             <TextInput accessibilityLabel="Buscar lote ou fornecedor" autoCorrect={false} clearButtonMode="while-editing"
@@ -136,6 +147,7 @@ export default function LotsScreen() {
                     </Text>
                   </View>
                 </View>
+                <Pressable accessibilityRole="button" onPress={() => router.push({ pathname: '/lote/[lotId]', params: { lotId: lot.id } })} style={styles.secondaryAction}><Text style={styles.secondaryActionText}>Consultar dormentes e histórico →</Text></Pressable>
 
                 {lot.status === 'inspection' && <>
                   <View style={styles.inspectorPill}><MaterialCommunityIcons name="account-hard-hat-outline" size={17} color="#4f5459" /><Text style={styles.inspectorName}>{lot.operatorName}</Text></View>
@@ -180,7 +192,7 @@ export default function LotsScreen() {
         <View style={styles.navigation}>
           <Pressable accessibilityRole="button" accessibilityLabel="Início" onPress={() => router.navigate('/(tabs)')} style={styles.navItem}><Ionicons name="grid-outline" size={24} color="#d8dcdc" /><Text style={styles.navLabel}>Início</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Lotes" accessibilityState={{ selected: true }} style={[styles.navItem, styles.navSelected]}><Ionicons name="layers-outline" size={24} color="#fff" /><Text style={styles.navLabelSelected}>Lotes</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Selecionar lote para inspeção" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={29} color="#fff" /></Pressable>
+          <Pressable accessibilityRole="button" accessibilityLabel="Ler QR Code ou NFC" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={29} color="#fff" /></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Histórico" onPress={() => setPanel('history')} style={styles.navItem}><Ionicons name="time-outline" size={25} color="#d8dcdc" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
           <Pressable accessibilityRole="button" accessibilityLabel="Ajustes" onPress={() => setPanel('settings')} style={styles.navItem}><Ionicons name="options-outline" size={25} color="#d8dcdc" /><Text style={styles.navLabel}>Ajustes</Text></Pressable>
         </View>
@@ -194,10 +206,7 @@ export default function LotsScreen() {
           <Text style={styles.panelDescription}>Este resumo usa os registros salvos neste dispositivo.</Text>
         </>}
         {panel === 'export' && selectedLot && <><Text style={styles.panelDescription}>Lote {selectedLot.code}: {lotMetrics(store, selectedLot).completed} inspeções concluídas.</Text><Text style={styles.panelHint}>A exportação em PDF depende da integração com o serviço de relatórios, ainda indisponível neste projeto.</Text></>}
-        {panel === 'scan' && <><Text style={styles.panelDescription}>Selecione um lote para iniciar ou continuar a inspeção.</Text>
-          {lots.filter((lot) => lot.status !== 'finished').map((lot) => <Pressable key={lot.id} accessibilityRole="button" onPress={() => lot.status === 'waiting' ? startInspection(lot) : lotMetrics(store, lot).pending ? continueInspection(lot) : finalize(lot)} style={styles.panelListItem}>
-            <Ionicons name="layers-outline" size={23} color="#303636" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>{lot.code}</Text><Text style={styles.mutedText}>{lot.line}</Text></View><Ionicons name="chevron-forward" size={18} color="#64696b" /></Pressable>)}
-        </>}
+        {panel === 'scan' && <ScanActions onChoose={() => setPanel(null)} />}
         {panel === 'history' && <><Text style={styles.panelDescription}>Lotes concluídos e em andamento neste dispositivo.</Text>{lots.filter((lot) => lot.status !== 'waiting').map((lot) => <Pressable key={lot.id} accessibilityRole="button" onPress={() => lot.status === 'finished' ? openLot(lot, 'report') : continueInspection(lot)} style={styles.panelListItem}><Ionicons name={lot.status === 'finished' ? 'checkmark-circle-outline' : 'time-outline'} size={23} color="#303636" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>{lot.code}</Text><Text style={styles.mutedText}>{lot.status === 'finished' ? 'Concluído' : 'Em inspeção'}</Text></View><Ionicons name="chevron-forward" size={18} color="#64696b" /></Pressable>)}</>}
         {panel === 'settings' && <><Text style={styles.panelDescription}>RailLog Inspect</Text><View style={styles.panelListItem}><Ionicons name="save-outline" size={23} color="#55595c" /><View style={styles.panelListCopy}><Text style={styles.panelListTitle}>Dados locais</Text><Text style={styles.mutedText}>Inspeções e fotos permanecem neste dispositivo.</Text></View></View></>}
       </OperationPanel>

@@ -61,6 +61,10 @@ function RootLayoutNav() {
             <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen name="cadastrar-lote" options={{ headerShown: false }} />
             <Stack.Screen name="inspecionar/[lotId]" options={{ headerShown: false }} />
+            <Stack.Screen name="ler-etiqueta" options={{ headerShown: false }} />
+            <Stack.Screen name="dormente/[sleeperId]" options={{ headerShown: false }} />
+            <Stack.Screen name="lote/[lotId]" options={{ headerShown: false }} />
+            <Stack.Screen name="operadores" options={{ headerShown: false }} />
             <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
           </Stack>
         </ThemeProvider>

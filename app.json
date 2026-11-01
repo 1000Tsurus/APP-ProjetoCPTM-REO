@@ -40,11 +40,21 @@
           "faceIDPermission": "Permitir que o aplicativo CPTM use Face ID para validar o acesso operacional."
         }
       ],
-      "expo-secure-store"
-      ,[
+      "expo-secure-store",
+      [
         "expo-camera",
-        { "cameraPermission": "Permitir que o RailLog Inspect capture fotografias das inspeções de dormentes.", "recordAudioAndroid": false }
-      ]
+        {
+          "cameraPermission": "Permitir que o RailLog Inspect leia QR Codes e capture fotografias das inspeções de dormentes.",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "react-native-nfc-manager",
+        {
+          "nfcPermission": "Permitir que o RailLog Inspect leia etiquetas NFC dos dormentes."
+        }
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true

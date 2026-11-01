@@ -1,5 +1,5 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { usePreventRemove, useRouter } from 'expo-router';
+import { Redirect, usePreventRemove, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -12,7 +12,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function CreateLotScreen() {
   const router = useRouter();
-  const { profile } = useSession();
+  const { profile, canManage } = useSession();
   const [line, setLine] = useState('');
   const [location, setLocation] = useState('');
   const [supplier, setSupplier] = useState('');
@@ -44,6 +44,7 @@ export default function CreateLotScreen() {
 
   async function save(start: boolean) {
     if (saving) return;
+    if (!canManage) { setError('Somente um gerente autenticado no servidor pode criar lotes.'); return; }
     const total = Number(quantity);
     if (!line.trim() || !location.trim() || !supplier.trim() || !material || !Number.isInteger(total) || total <= 0) {
       setError('Preencha linha, trecho, fornecedor, material e uma quantidade inteira maior que zero.');
@@ -63,6 +64,8 @@ export default function CreateLotScreen() {
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar o lote.'); setSaving(false); }
   }
 
+  if (!profile) return <Redirect href="/login" />;
+  if (!canManage) return <SafeAreaView style={styles.screen}><View style={styles.content}><Text style={styles.title}>Criação restrita à gerência</Text><Text style={styles.hint}>É necessária uma sessão de gerente validada pelo backend. Esta ação não está disponível no modo local.</Text><Pressable onPress={() => router.replace('/(tabs)/lotes')} style={styles.secondary}><Text>Voltar aos lotes</Text></Pressable></View></SafeAreaView>;
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <View style={styles.header}><Pressable onPress={cancel} accessibilityRole="button" accessibilityLabel="Voltar" style={styles.back}><Ionicons name="arrow-back" size={23} color="#24292c" /></Pressable>
       <View><Text style={styles.title}>Novo Lote</Text><Text style={styles.subtitle}>Cadastro de lote para inspeção</Text></View></View>

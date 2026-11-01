@@ -7,6 +7,7 @@ import {
   StyleSheet, Text, TextInput, View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { backendConfigured, submitAccessRequest } from '@/data/access-service';
 
 type FuncaoOperacional = 'Pátio' | 'Linha' | 'Supervisão';
 type CredencialForm = {
@@ -18,7 +19,6 @@ type CredencialForm = {
   confirmarSenha: string;
   termoAceito: boolean;
 };
-type CredencialPayload = Omit<CredencialForm, 'confirmarSenha'>;
 type Feedback = { kind: 'error' | 'info' | 'success'; text: string };
 
 const FUNCOES: readonly FuncaoOperacional[] = ['Pátio', 'Linha', 'Supervisão'];
@@ -46,15 +46,15 @@ export default function CadastroScreen() {
     const nome = nomeCompleto.trim();
     const identificador = matriculaOuEmail.trim();
     const base = baseLotacao.trim();
-    if (!nome || !identificador || !funcaoOperacional || !base || !senha || !confirmarSenha) {
+    if (!nome || !identificador || !funcaoOperacional || !base || (backendConfigured && (!senha || !confirmarSenha))) {
       setFeedback({ kind: 'error', text: 'Preencha todos os campos para solicitar a credencial.' });
       return;
     }
-    if (senha.length < 8) {
+    if (backendConfigured && senha.length < 8) {
       setFeedback({ kind: 'error', text: 'A senha deve ter no mínimo 8 caracteres.' });
       return;
     }
-    if (senha !== confirmarSenha) {
+    if (backendConfigured && senha !== confirmarSenha) {
       setFeedback({ kind: 'error', text: 'As senhas informadas não coincidem.' });
       return;
     }
@@ -63,37 +63,19 @@ export default function CadastroScreen() {
       return;
     }
 
-    const payload: CredencialPayload = {
-      nomeCompleto: nome, matriculaOuEmail: identificador, funcaoOperacional,
-      baseLotacao: base, senha, termoAceito,
-    };
     setFeedback(null);
     setLoading(true);
     try {
-      const endpoint = process.env.EXPO_PUBLIC_CREDENTIALS_API_URL;
-      if (!endpoint) {
-        setFeedback({
-          kind: 'info',
-          text: 'Dados validados. Configure a URL da API para enviar a solicitação.',
-        });
-        return;
-      }
-      // Chamada da API: substitua este fetch pelo cliente/endpoint de cadastro do seu backend.
-      // Envie a senha somente por HTTPS; a aprovação operacional deve ser feita no servidor.
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!response.ok) throw new Error('Falha ao solicitar cadastro.');
+      await submitAccessRequest({ nomeCompleto: nome, matriculaOuEmail: identificador, funcaoOperacional, baseLotacao: base }, senha);
+      setSenha(''); setConfirmarSenha('');
       setFeedback({
         kind: 'success',
-        text: 'Solicitação enviada. Aguarde a aprovação da supervisão.',
+        text: backendConfigured ? 'Solicitação enviada ao servidor. Aguarde a aprovação da gerência.' : 'Solicitação pendente salva somente neste dispositivo, sem senha. Não foi enviada à gerência. Aprovação segura e notificação remota exigem integração com o backend.',
       });
-    } catch {
+    } catch (cause) {
       setFeedback({
         kind: 'error',
-        text: 'Não foi possível enviar a solicitação. Tente novamente.',
+        text: cause instanceof Error ? cause.message : 'Não foi possível salvar a solicitação. Tente novamente.',
       });
     } finally {
       setLoading(false);
@@ -121,7 +103,7 @@ export default function CadastroScreen() {
                 <View style={styles.redDot} />
                 <Text style={styles.versionText}>TERMINAL DE CAMPO • V3.4</Text>
               </View>
-              <Text style={styles.secureText}>SISTEMA SEGURO</Text>
+              <Text style={styles.secureText}>{backendConfigured ? 'API CONFIGURADA' : 'MODO LOCAL'}</Text>
             </View>
 
             <View style={styles.navigationRow}>
@@ -164,7 +146,7 @@ export default function CadastroScreen() {
               <View style={styles.approvalCopy}>
                 <Text style={styles.approvalTitle}>Aprovação Obrigatória</Text>
                 <Text style={styles.approvalDescription}>
-                  O perfil passará pela liberação da supervisão antes do início da jornada.
+                  {backendConfigured ? 'A gerência deve aprovar o acesso no servidor antes do início da jornada.' : 'Sem backend: a solicitação fica pendente neste aparelho. Nenhuma aprovação ou notificação remota está disponível.'}
                 </Text>
               </View>
             </View>
@@ -289,7 +271,7 @@ export default function CadastroScreen() {
                 )}
               </View>
 
-              <View style={styles.field}>
+              {backendConfigured && <><View style={styles.field}>
                 <Text style={styles.label}>Senha de Acesso</Text>
                 <View style={styles.inputShell}>
                   <Ionicons name="lock-closed-outline" size={17} color="#a1a3a5" />
@@ -338,6 +320,7 @@ export default function CadastroScreen() {
                 </View>
               </View>
 
+              </>}
               <Pressable
                 accessibilityLabel="Declaro que os dados são verídicos"
                 accessibilityRole="checkbox"
@@ -379,7 +362,7 @@ export default function CadastroScreen() {
               </Pressable>
               <View style={styles.securityNote}>
                 <Ionicons name="lock-closed-outline" size={14} color="#a2a5a8" />
-                <Text style={styles.securityNoteText}>Criptografia Ponta a Ponta • Padrão ABNT Ferroviário</Text>
+                <Text style={styles.securityNoteText}>{backendConfigured ? 'Solicitação sujeita à aprovação do servidor' : 'Armazenamento local • Sem envio remoto'}</Text>
               </View>
             </View>
           </View>
