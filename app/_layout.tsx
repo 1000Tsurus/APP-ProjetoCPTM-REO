@@ -1,5 +1,7 @@
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
+import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SwipeStack as Stack, swipeStackOptions } from '@/components/navigation/SwipeStack';
 import * as SplashScreen from 'expo-splash-screen';
 import { Fragment, useEffect } from 'react';
 import { Platform } from 'react-native';
@@ -51,24 +53,26 @@ function RootLayoutNav() {
   const SafeAreaRoot = Platform.OS === 'web' ? Fragment : SafeAreaProvider;
 
   return (
-    <SafeAreaRoot>
-      <SessionProvider>
-        <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-          <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="cadastro" options={{ headerShown: false }} />
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="cadastrar-lote" options={{ headerShown: false }} />
-            <Stack.Screen name="inspecionar/[lotId]" options={{ headerShown: false }} />
-            <Stack.Screen name="ler-etiqueta" options={{ headerShown: false }} />
-            <Stack.Screen name="dormente/[sleeperId]" options={{ headerShown: false }} />
-            <Stack.Screen name="lote/[lotId]" options={{ headerShown: false }} />
-            <Stack.Screen name="operadores" options={{ headerShown: false }} />
-            <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
-          </Stack>
-        </ThemeProvider>
-      </SessionProvider>
-    </SafeAreaRoot>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaRoot>
+        <SessionProvider>
+          <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
+            <Stack screenOptions={swipeStackOptions}>
+              <Stack.Screen name="index" />
+              <Stack.Screen name="login" />
+              <Stack.Screen name="cadastro" />
+              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="cadastrar-lote" />
+              <Stack.Screen name="inspecionar/[lotId]" />
+              <Stack.Screen name="ler-etiqueta" />
+              <Stack.Screen name="dormente/[sleeperId]" />
+              <Stack.Screen name="lote/[lotId]" />
+              <Stack.Screen name="operadores" />
+              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
+            </Stack>
+          </ThemeProvider>
+        </SessionProvider>
+      </SafeAreaRoot>
+    </GestureHandlerRootView>
   );
 }

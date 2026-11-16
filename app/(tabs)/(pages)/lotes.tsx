@@ -1,8 +1,8 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Alert, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -22,6 +22,7 @@ const FILTERS: { key: Filter; label: string }[] = [
 
 export default function LotsScreen() {
   const router = useRouter();
+  const { open, request } = useLocalSearchParams<{ open?: string; request?: string }>();
   const { canManage, mode, profile } = useSession();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -32,6 +33,9 @@ export default function LotsScreen() {
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<Filter>('all');
   const [panel, setPanel] = useState<Panel>(null);
+  useEffect(() => {
+    if (open === 'scan' || open === 'history' || open === 'settings') setPanel(open);
+  }, [open, request]);
   const [selectedId, setSelectedId] = useState('');
 
   useFocusEffect(useCallback(() => {
@@ -89,7 +93,7 @@ export default function LotsScreen() {
           <View style={styles.brandIcon}><MaterialCommunityIcons name="train" size={25} color="#fff" /></View>
           <View style={styles.brandCopy}><Text style={styles.brand}>RAILLOG INSPECT</Text><Text style={styles.pageTitle}>Lotes</Text></View>
           <View style={styles.online}><View style={styles.onlineDot} /><Text style={styles.onlineText}>Local</Text></View>
-          <Pressable accessibilityRole="button" accessibilityLabel="Abrir perfil" onPress={() => router.push('/(tabs)/perfil')} style={styles.avatar}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Abrir perfil" onPress={() => router.push('/(tabs)/(pages)/perfil')} style={styles.avatar}>
             <Ionicons name="person-outline" size={19} color="#fff" />
           </Pressable>
         </View>
@@ -187,16 +191,6 @@ export default function LotsScreen() {
           </View>
         </View>
       </ScrollView>
-
-      <View pointerEvents="box-none" style={[styles.navigationContainer, { bottom: Math.max(16, insets.bottom) }]}>
-        <View style={styles.navigation}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Início" onPress={() => router.navigate('/(tabs)')} style={styles.navItem}><Ionicons name="grid-outline" size={24} color="#d8dcdc" /><Text style={styles.navLabel}>Início</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Lotes" accessibilityState={{ selected: true }} style={[styles.navItem, styles.navSelected]}><Ionicons name="layers-outline" size={24} color="#fff" /><Text style={styles.navLabelSelected}>Lotes</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ler QR Code ou NFC" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={29} color="#fff" /></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Histórico" onPress={() => setPanel('history')} style={styles.navItem}><Ionicons name="time-outline" size={25} color="#d8dcdc" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ajustes" onPress={() => setPanel('settings')} style={styles.navItem}><Ionicons name="options-outline" size={25} color="#d8dcdc" /><Text style={styles.navLabel}>Ajustes</Text></Pressable>
-        </View>
-      </View>
 
       <OperationPanel title={panel ? panelTitles[panel] : ''} visible={panel !== null} onClose={() => setPanel(null)}>
         {panel === 'report' && selectedLot && <>

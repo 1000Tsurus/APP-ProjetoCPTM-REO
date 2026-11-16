@@ -1,4 +1,4 @@
-﻿import Ionicons from '@expo/vector-icons/Ionicons';
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
@@ -86,7 +86,7 @@ export default function HomeScreen() {
             <View style={styles.brandIcon}><Ionicons name="train-outline" size={22} color="#fff" /></View>
             <View style={styles.brandCopy}><Text style={styles.brand}>RAILLOG INSPECT</Text><Text style={styles.pageTitle}>Início</Text></View>
             <View style={styles.demoBadge}><View style={styles.demoDot} /><Text style={styles.demoBadgeText}>Demo</Text></View>
-            <Pressable accessibilityRole="button" accessibilityLabel="Abrir meu perfil" onPress={() => router.push('/(tabs)/perfil')} style={styles.avatar}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Abrir meu perfil" onPress={() => router.push('/(tabs)/(pages)/perfil')} style={styles.avatar}>
               <Ionicons name="person-outline" size={18} color="#fff" />
             </Pressable>
           </View>
@@ -156,16 +156,6 @@ export default function HomeScreen() {
           <Text style={styles.demoNote}>AMBIENTE DEMONSTRATIVO • DADOS ILUSTRATIVOS</Text>
         </View>
       </ScrollView>
-
-      <View pointerEvents="box-none" style={[styles.navigationContainer, { bottom: Math.max(14, insets.bottom) }]}>
-        <View style={styles.navigation}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Início" accessibilityState={{ selected: panel === null }} onPress={() => { setPanel(null); scrollRef.current?.scrollTo({ y: 0, animated: true }); }} style={styles.navItem}><Ionicons name="grid-outline" size={21} color="#fff" /><Text style={styles.navLabel}>Início</Text></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => router.navigate('/(tabs)/lotes')} style={styles.navItem}><Ionicons name="layers-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Lotes</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ler QR Code ou NFC" onPress={() => setPanel('scan')} style={styles.navScan}><Ionicons name="qr-code-outline" size={28} color="#fff" /></Pressable>
-          <Pressable accessibilityRole="button" onPress={() => setPanel('history')} style={styles.navItem}><Ionicons name="time-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Perfil" onPress={() => router.navigate('/(tabs)/perfil')} style={styles.navItem}><Ionicons name="person-outline" size={23} color="#c7cdcd" /><Text style={styles.navLabel}>Perfil</Text></Pressable>
-        </View>
-      </View>
 
       <OperationPanel title={panel ? panelTitles[panel] : ''} visible={panel !== null} onClose={() => setPanel(null)}>
         {panel === 'scan' && <ScanActions onChoose={() => setPanel(null)} />}

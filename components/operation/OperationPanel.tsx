@@ -1,17 +1,46 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Modal, PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { PropsWithChildren } from 'react';
+import { useEffect, useMemo, useRef, type PropsWithChildren } from 'react';
+import { isDismissDrag, shouldDismiss } from '@/data/swipe-gesture';
 
 export function OperationPanel({ title, visible, onClose, children }: PropsWithChildren<{
   title: string; visible: boolean; onClose: () => void;
 }>) {
   const insets = useSafeAreaInsets();
+  const translateX = useRef(new Animated.Value(0)).current;
+  const width = useRef(520);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    translateX.stopAnimation();
+    translateX.setValue(0);
+    return () => translateX.stopAnimation();
+  }, [visible, translateX]);
+  const pan = useMemo(() => {
+    const reset = () => Animated.spring(translateX, {
+      toValue: 0, useNativeDriver: true, tension: 80, friction: 12,
+    }).start();
+    return PanResponder.create({
+      onMoveShouldSetPanResponder: (_, gesture) =>
+        gesture.numberActiveTouches === 1 && isDismissDrag(gesture.dx, gesture.dy),
+      onPanResponderMove: (_, gesture) => translateX.setValue(Math.max(0, gesture.dx)),
+      onPanResponderRelease: (_, gesture) => {
+        if (!shouldDismiss(gesture.dx, gesture.vx, width.current)) { reset(); return; }
+        Animated.timing(translateX, {
+          toValue: width.current, duration: 180, useNativeDriver: true,
+        }).start(({ finished }) => { if (finished) onCloseRef.current(); });
+      },
+      onPanResponderTerminate: reset,
+    });
+  }, [translateX]);
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <View style={styles.overlay}>
         <Pressable accessibilityRole="button" accessibilityLabel="Fechar painel" onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View accessibilityViewIsModal style={[styles.panel, { paddingBottom: Math.max(24, insets.bottom), marginTop: insets.top + 20 }]}>
+        <Animated.View accessibilityViewIsModal {...pan.panHandlers}
+          onLayout={(event) => { width.current = event.nativeEvent.layout.width; }}
+          style={[styles.panel, { paddingBottom: Math.max(24, insets.bottom), marginTop: insets.top + 20, transform: [{ translateX }] }]}>
           <View style={styles.handle} />
           <View style={styles.header}>
             <Text accessibilityRole="header" style={styles.title}>{title}</Text>
@@ -20,7 +49,7 @@ export function OperationPanel({ title, visible, onClose, children }: PropsWithC
             </Pressable>
           </View>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>{children}</ScrollView>
-        </View>
+        </Animated.View>
       </View>
     </Modal>
   );

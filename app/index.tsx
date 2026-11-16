@@ -104,7 +104,7 @@ export default function LoginScreen() {
       return;
     }
     setSigningIn(true); setFeedback('');
-    try { await authenticateSession(identifier, password); setPassword(''); router.replace('/(tabs)'); }
+    try { await authenticateSession(identifier, password); setPassword(''); router.replace('/(tabs)/(pages)'); }
     catch (cause) { setFeedback(cause instanceof Error ? cause.message : 'Não foi possível entrar.'); }
     finally { setSigningIn(false); }
   }
@@ -138,7 +138,7 @@ export default function LoginScreen() {
           return;
         }
         await startSession(savedProfile);
-        router.replace('/(tabs)');
+        router.replace('/(tabs)/(pages)');
       }
     } catch { setFeedback('Não foi possível validar a biometria neste aparelho.'); } finally {
       setIsBiometricLoading(false);

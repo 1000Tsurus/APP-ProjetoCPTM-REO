@@ -60,12 +60,12 @@ export default function CreateLotScreen() {
         total, receiptDate, notes: notes.trim(), operatorId: profile.matriculaOuEmail, operatorName: profile.nomeCompleto }, start);
       disablePrevention();
       if (start) router.replace({ pathname: '/inspecionar/[lotId]', params: { lotId: lot.id } });
-      else router.replace('/(tabs)/lotes');
+      else router.replace('/(tabs)/(pages)/lotes');
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível salvar o lote.'); setSaving(false); }
   }
 
   if (!profile) return <Redirect href="/login" />;
-  if (!canManage) return <SafeAreaView style={styles.screen}><View style={styles.content}><Text style={styles.title}>Criação restrita à gerência</Text><Text style={styles.hint}>É necessária uma sessão de gerente validada pelo backend. Esta ação não está disponível no modo local.</Text><Pressable onPress={() => router.replace('/(tabs)/lotes')} style={styles.secondary}><Text>Voltar aos lotes</Text></Pressable></View></SafeAreaView>;
+  if (!canManage) return <SafeAreaView style={styles.screen}><View style={styles.content}><Text style={styles.title}>Criação restrita à gerência</Text><Text style={styles.hint}>É necessária uma sessão de gerente validada pelo backend. Esta ação não está disponível no modo local.</Text><Pressable onPress={() => router.replace('/(tabs)/(pages)/lotes')} style={styles.secondary}><Text>Voltar aos lotes</Text></Pressable></View></SafeAreaView>;
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <View style={styles.header}><Pressable onPress={cancel} accessibilityRole="button" accessibilityLabel="Voltar" style={styles.back}><Ionicons name="arrow-back" size={23} color="#24292c" /></Pressable>
       <View><Text style={styles.title}>Novo Lote</Text><Text style={styles.subtitle}>Cadastro de lote para inspeção</Text></View></View>

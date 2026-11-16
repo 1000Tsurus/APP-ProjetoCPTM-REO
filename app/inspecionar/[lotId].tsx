@@ -85,7 +85,7 @@ export default function InspectScreen() {
   }
 
   async function leave() {
-    try { await flush(step); disablePrevention(); router.replace('/(tabs)/lotes'); }
+    try { await flush(step); disablePrevention(); router.replace('/(tabs)/(pages)/lotes'); }
     catch { setError('Não foi possível salvar. Tente novamente antes de sair.'); }
   }
 
@@ -163,7 +163,7 @@ export default function InspectScreen() {
           if (Platform.OS === 'web') window.alert('Inspeção concluída. O próximo dormente está disponível.');
           else Alert.alert('Inspeção concluída', 'O próximo dormente está disponível.');
           await refresh();
-        } else { disablePrevention(); router.replace('/(tabs)/lotes'); }
+        } else { disablePrevention(); router.replace('/(tabs)/(pages)/lotes'); }
       } catch (cause) { setError(cause instanceof Error ? cause.message : 'Não foi possível concluir a inspeção.'); }
       finally { setBusy(false); }
     };
@@ -183,7 +183,7 @@ export default function InspectScreen() {
 
   const filled = draft ? [draft.material, draft.condition, draft.cracks, draft.humidity, draft.residualYears].filter((value) => value !== null).length + PHOTO_CATEGORIES.filter((item) => !!photoUris[item.id]).length : 0;
   if (!profile) return <Redirect href="/login" />;
-  if (!lot || !inspection || !draft) return <SafeAreaView style={styles.screen}><View style={styles.center}><Text>{error || 'Carregando inspeção...'}</Text><Pressable onPress={() => router.replace('/(tabs)/lotes')}><Text style={styles.link}>Voltar aos lotes</Text></Pressable></View></SafeAreaView>;
+  if (!lot || !inspection || !draft) return <SafeAreaView style={styles.screen}><View style={styles.center}><Text>{error || 'Carregando inspeção...'}</Text><Pressable onPress={() => router.replace('/(tabs)/(pages)/lotes')}><Text style={styles.link}>Voltar aos lotes</Text></Pressable></View></SafeAreaView>;
 
   return <SafeAreaView style={styles.screen} edges={['top', 'bottom']}>
     <View style={styles.header}><Pressable accessibilityRole="button" accessibilityLabel="Voltar e salvar rascunho" onPress={leave} style={styles.back}><Ionicons name="arrow-back" size={23} color="#22272a" /></Pressable><View><Text style={styles.title}>Inspecionar</Text><Text style={styles.subtitle}>{lot.code} · {inspection.sleeperId}</Text></View></View>

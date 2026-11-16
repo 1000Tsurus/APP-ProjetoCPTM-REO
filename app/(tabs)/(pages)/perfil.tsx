@@ -34,7 +34,7 @@ export default function ProfileScreen() {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.scroll, { paddingBottom: 125 + insets.bottom }]}>
         <View style={styles.content}>
           <View style={styles.header}>
-            <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)')} style={styles.back}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Voltar" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/(pages)')} style={styles.back}>
               <Ionicons name="arrow-back" size={23} color="#252c2d" />
             </Pressable>
             <Text accessibilityRole="header" style={styles.title}>Meu Perfil</Text>
@@ -68,15 +68,6 @@ export default function ProfileScreen() {
         </View>
       </ScrollView>
 
-      <View pointerEvents="box-none" style={[styles.navigationContainer, { bottom: Math.max(14, insets.bottom) }]}>
-        <View style={styles.navigation}>
-          <Pressable accessibilityRole="button" accessibilityLabel="Início" onPress={() => router.navigate('/(tabs)')} style={styles.navItem}><Ionicons name="grid-outline" size={21} color="#c7cdcd" /><Text style={styles.navLabel}>Início</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Lotes" onPress={() => router.navigate('/(tabs)/lotes')} style={styles.navItem}><Ionicons name="layers-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Lotes</Text></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Ler QR Code ou NFC" onPress={() => router.navigate({ pathname: '/(tabs)', params: { open: 'scan', request: String(Date.now()) } })} style={styles.navScan}><Ionicons name="qr-code-outline" size={27} color="#fff" /></Pressable>
-          <Pressable accessibilityRole="button" accessibilityLabel="Histórico" onPress={() => router.navigate({ pathname: '/(tabs)', params: { open: 'history', request: String(Date.now()) } })} style={styles.navItem}><Ionicons name="time-outline" size={22} color="#c7cdcd" /><Text style={styles.navLabel}>Histórico</Text></Pressable>
-          <View accessibilityRole="tab" accessibilityState={{ selected: true }} style={[styles.navItem, styles.navSelected]}><Ionicons name="person-outline" size={22} color="#fff" /><Text style={styles.navSelectedText}>Perfil</Text></View>
-        </View>
-      </View>
     </SafeAreaView>
   );
 }

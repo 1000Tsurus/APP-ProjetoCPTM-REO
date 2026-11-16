@@ -42,7 +42,7 @@ export default function SleeperScreen() {
   if (!profile) return <Redirect href="/login" />;
   const latest = record?.history.find((item) => item.status === 'completed');
   return <SafeAreaView style={styles.screen}><ScrollView contentContainerStyle={styles.content}>
-    <Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/lotes')} style={styles.secondary}><Text>Voltar</Text></Pressable>
+    <Pressable accessibilityRole="button" onPress={() => router.canGoBack() ? router.back() : router.replace('/(tabs)/(pages)/lotes')} style={styles.secondary}><Text>Voltar</Text></Pressable>
     <Text style={styles.title}>{sleeperId}</Text>
     {!!error && <Text accessibilityRole="alert" style={styles.error}>{error}</Text>}
     {record && <>

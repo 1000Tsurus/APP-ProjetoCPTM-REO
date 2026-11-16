@@ -40,11 +40,11 @@ export default function EditProfileScreen() {
     if (router.canGoBack()) router.back();
     else if (!dirty || (Platform.OS === 'web' && window.confirm('Descartar as alterações não salvas?'))) {
       allowLeave.current = true;
-      router.replace('/(tabs)/perfil');
+      router.replace('/(tabs)/(pages)/perfil');
     }
     else if (Platform.OS !== 'web') Alert.alert('Alterações não salvas', 'Deseja descartar as alterações?', [
       { text: 'Continuar editando', style: 'cancel' },
-      { text: 'Descartar', style: 'destructive', onPress: () => { allowLeave.current = true; router.replace('/(tabs)/perfil'); } },
+      { text: 'Descartar', style: 'destructive', onPress: () => { allowLeave.current = true; router.replace('/(tabs)/(pages)/perfil'); } },
     ]);
   }
 
@@ -61,7 +61,7 @@ export default function EditProfileScreen() {
     try {
       await updateProfile({ nomeCompleto: normalized });
       allowLeave.current = true;
-      router.dismissTo('/(tabs)/perfil');
+      router.dismissTo('/(tabs)/(pages)/perfil');
     } catch {
       setError('Não foi possível salvar neste dispositivo. Verifique o armazenamento e tente novamente.');
     } finally {

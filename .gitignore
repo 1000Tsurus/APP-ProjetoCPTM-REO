@@ -5,6 +5,7 @@ node_modules/
 
 # Expo
 .expo/
+.playwright-cli/
 dist/
 dist-validation/
 web-build/
