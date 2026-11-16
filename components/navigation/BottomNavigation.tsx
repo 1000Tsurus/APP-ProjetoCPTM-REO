@@ -36,8 +36,8 @@ export function BottomNavigation({ state, navigateToTab, insets }: MaterialTopTa
 
 function item(label: string, icon: React.ComponentProps<typeof Ionicons>['name'], selected: boolean, onPress: () => void) {
   return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ selected }} aria-pressed={selected}
-    onPress={onPress} style={[styles.item, selected && styles.selected]}>
-    <Ionicons name={icon} size={22} color={selected ? '#fff' : '#c7cdcd'} />
+    onPress={onPress} style={styles.item}>
+    <Ionicons name={icon} size={22} color={selected ? '#ff5964' : '#c7cdcd'} />
     <Text style={styles.label}>{label}</Text>
   </Pressable>;
 }
@@ -47,7 +47,6 @@ const styles = StyleSheet.create({
   bar: { width: '100%', maxWidth: 450, minHeight: 74, borderRadius: 40, backgroundColor: '#303636',
     flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8 },
   item: { flex: 1, minHeight: 58, borderRadius: 30, alignItems: 'center', justifyContent: 'center', gap: 4 },
-  selected: { backgroundColor: '#c80e28' },
   label: { color: '#fff', fontSize: 11 },
   scan: { width: 56, height: 56, borderRadius: 28, marginHorizontal: 3, backgroundColor: '#e62328',
     alignItems: 'center', justifyContent: 'center' },
