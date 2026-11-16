@@ -54,7 +54,8 @@
           "nfcPermission": "Permitir que o RailLog Inspect leia etiquetas NFC dos dormentes."
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-status-bar"
     ],
     "experiments": {
       "typedRoutes": true
