@@ -37,6 +37,7 @@
   "scripts": {
     "test": "node --test tests/*.test.cjs",
     "typecheck": "tsc --noEmit",
+    "test:api": "node --test tests/integration/*.cjs",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
