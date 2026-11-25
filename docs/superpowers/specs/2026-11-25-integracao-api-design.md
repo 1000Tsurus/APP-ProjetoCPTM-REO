@@ -154,7 +154,55 @@ Removidos: `cadastro`, `cadastrar-lote`, `lote/[lotId]`, `ler-etiqueta` (QR/NFC)
 `package.json`/`app.json` fica a critério do Pina no review (ver "Deixado ao implementador").
 
 Rótulos em PT para enums (good → Bom, fair → Regular, poor → Ruim; dry/moist/wet → Seco/Úmido/Molhado;
-in_stock → Em estoque etc.) num único `labels.ts`.
+in_stock → Em estoque etc.) num único `labels.ts`, **com os mesmos textos e tons** de
+`src/rotulos.js` do site (ex.: `quarantine` → "Quarentena", tom `warn`).
+
+### Visual: padronizar com o site
+
+Pedido do Caio: o app deve ficar parecido com o site gerencial. Fonte de verdade: `src/ui.jsx` e
+`src/rotulos.js` do repo `mpliHD/mpliHD.github.io`.
+
+**Como está hoje (diferenças):**
+| | Site | App hoje |
+|---|---|---|
+| Cores | Paleta única `COLOR` (vermelho CPTM `#E2001A`, cinza `#707173`, fundo `#F5F5F5`, status verde/âmbar/azul gov.br) | ~15 tons soltos de vermelho (`#e42125`, `#e52329`, `#e7282f`…) e cinzas espalhados pelos arquivos |
+| Forma | Cantos retos: 4 px (campos, botões), 6 px (painéis); painel branco com borda `#E2E2E2` | Cantos muito arredondados (15–28 px), botões em pílula, cartões sem borda |
+| Fonte | Roboto; Roboto Mono para dado-código (tag, RM, matrícula) | Fonte do sistema, sem distinção para códigos |
+| Marca | Logotipo oficial CPTM (`logo-cptm.png`, `simbolo-cptm.png`) + "Armazém / Monitoramento logístico" | Caixa vermelha desenhada no lugar do logo |
+| Status | `Selo` (pílula pequena com fundo claro e texto no tom), `SignalDot` | Textos e cores por tela |
+| Ícones | lucide | Ionicons |
+| Tema | Só claro | Claro/escuro automático (`userInterfaceStyle: automatic`) |
+
+**O que muda no app:**
+- `constants/theme.ts` com `COLOR` **copiado do site** (mesmos nomes e valores, comentário apontando para
+  `src/ui.jsx`), mais `RADIUS` (4/6), espaçamentos e `FONT`/`FONT_CODE`. Nenhuma cor literal fora desse
+  arquivo. `constants/Colors.ts` (template do Expo) sai.
+- Componentes em `components/ui/`, versões RN das peças do site com o mesmo comportamento visual:
+  `Panel` (com `accent` na borda esquerda), `Label`, `Field`, `PasswordInput` (olho mostrar/ocultar),
+  `Button` (`primary` vermelho sólido, `ghost` contorno, `subtle` cinza; `small`), `Badge` (= `Selo`,
+  tons `ok/info/warn/danger/neutro`), `SectionTitle` (ícone vermelho + título + sub), `EmptyState`,
+  `SignalDot`, `Banner` (faixa âmbar como `FaixaDemo`, usada para "Sem conexão" e "N pendentes de envio"),
+  `BrandHeader` (= `MarcaSistema`). As telas usam só esses componentes + `theme.ts`.
+- `workflow-styles.ts` é substituído pelos componentes acima.
+- Logotipo: copiar `logo-cptm.png` e `simbolo-cptm.png` do repo do site para `assets/images/` (mesmo
+  arquivo, mesma origem documentada). Ícone/splash do app ficam como estão (não fazem parte do pedido).
+- Login no estilo do site: bloco superior vermelho (`red`, com o logotipo num cartão branco, como o
+  painel do login do site) e o formulário num `Panel` branco abaixo. Sem degradê animado (exigiria
+  `expo-linear-gradient`, dependência nova).
+- Tag, matrícula, RM e `registration_record` em `FONT_CODE`.
+- Tema só claro: `userInterfaceStyle: "light"` no `app.json`; `useColorScheme`/tema escuro saem.
+
+**Onde o app diverge do site de propósito (uso em campo, com luva e sol):**
+- Alvos de toque com no mínimo 48 dp (botões e campos), fonte base 16 em vez de 13–14. Mesmas cores,
+  cantos e pesos; só maiores.
+- Navegação por abas de baixo (Início, Dormentes, Perfil) no lugar do menu lateral do site, com item
+  ativo em vermelho, como o item ativo do menu do site.
+
+**Decisões do implementador (sem dependência nova):**
+- Fonte: Roboto é a fonte padrão do Android, então o texto normal usa a do sistema. Para código, usar a
+  família `monospace` do sistema. Embutir Roboto Mono exigiria baixar a fonte; fica como melhoria.
+- Ícones: continuar com Ionicons (já instalado), escolhendo os equivalentes de traço (`-outline`) dos
+  ícones lucide usados no site. Trocar para lucide exigiria `lucide-react-native` + `react-native-svg`.
 
 ### Contrato usado (todas já existem na API)
 `POST /auth/login {login, password}` · `POST /auth/refresh {refresh_token}` · `GET /auth/me` ·
