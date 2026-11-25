@@ -25,17 +25,6 @@ esses módulos apenas recarregando o JavaScript.
 Verificações automatizadas: `npm test`, `npm run typecheck` e
 `npx expo export --platform all`.
 
-Regressão da barra na web (somente ambiente local, sem backend): iniciar o Expo
-com `npx expo start --web --port 8091`, abrir uma sessão Playwright e executar:
-
-```powershell
-npx --yes --package @playwright/cli playwright-cli -s=cptm open http://localhost:8091 --browser chrome
-npx --yes --package @playwright/cli playwright-cli -s=cptm run-code --filename tests/browser/navigation-bar.js
-```
-
-Esse teste usa um identificador fictício no modo local, verifica os limites da
-barra e a seleção das páginas em 320×568, 390×844 e 1280×720, abre e fecha os
-atalhos e verifica o deslize. A captura final fica em `.expo/barra-corrigida.png`.
 O `cardStyle` da pilha precisa manter `flex: 1`: sem isso, na web o cartão cresce
 com o conteúdo e empurra a barra para fora da janela.
 
