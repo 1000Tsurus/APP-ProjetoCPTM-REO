@@ -3,13 +3,13 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SwipeStack as Stack, swipeStackOptions } from '@/components/navigation/SwipeStack';
 import * as SplashScreen from 'expo-splash-screen';
-import { Fragment, useEffect } from 'react';
+import { Fragment, useEffect, type PropsWithChildren } from 'react';
 import { Platform } from 'react-native';
 import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import { SessionProvider } from '@/contexts/SessionContext';
+import { SessionProvider, useSession } from '@/contexts/SessionContext';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -34,17 +34,20 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  useEffect(() => {
-    if (loaded) {
-      SplashScreen.hideAsync();
-    }
-  }, [loaded]);
-
   if (!loaded) {
     return null;
   }
 
   return <RootLayoutNav />;
+}
+
+/** Mantém o splash até a sessão salva ser restaurada; a navegação só monta depois disso. */
+function SessionGate({ children }: PropsWithChildren) {
+  const { ready } = useSession();
+  useEffect(() => {
+    if (ready) SplashScreen.hideAsync();
+  }, [ready]);
+  return ready ? <>{children}</> : null;
 }
 
 function RootLayoutNav() {
@@ -56,21 +59,15 @@ function RootLayoutNav() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaRoot>
         <SessionProvider>
+          <SessionGate>
           <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
             <Stack screenOptions={swipeStackOptions}>
               <Stack.Screen name="index" />
               <Stack.Screen name="login" />
-              <Stack.Screen name="cadastro" />
               <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="cadastrar-lote" />
-              <Stack.Screen name="inspecionar/[lotId]" />
-              <Stack.Screen name="ler-etiqueta" />
-              <Stack.Screen name="dormente/[sleeperId]" />
-              <Stack.Screen name="lote/[lotId]" />
-              <Stack.Screen name="operadores" />
-              <Stack.Screen name="modal" options={{ presentation: 'modal' }} />
             </Stack>
           </ThemeProvider>
+          </SessionGate>
         </SessionProvider>
       </SafeAreaRoot>
     </GestureHandlerRootView>
