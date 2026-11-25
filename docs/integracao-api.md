@@ -43,7 +43,7 @@ npm run test:api    # integração contra a API local
 
 Pré-requisitos: API local no ar (`docker compose up -d db`, `uv run alembic upgrade head`, `uv run python -m app.scripts.seed`, `uv run uvicorn app.main:app --port 4000`). Variáveis opcionais:
 
-- `REO_API_URL` (padrão `http://127.0.0.1:4000`)
+- `REO_API_URL` (padrão `http://127.0.0.1:4000`); hosts que não sejam localhost/127.0.0.1/[::1] são recusados a menos que `REO_API_ALLOW_REMOTE=1`
 - `REO_LOGIN` e `REO_PASSWORD` (senão lê `SEED_ADMIN_REGISTRATION` e `SEED_ADMIN_PASSWORD` do `.env` da API)
 - `REO_API_ENV_FILE` (padrão `../cptm-reo-api/.env`)
 
