@@ -9,3 +9,4 @@ export { Panel } from './Panel';
 export { PasswordInput } from './PasswordInput';
 export { SectionTitle } from './SectionTitle';
 export { SignalDot } from './SignalDot';
+export { OptionPicker, type PickerOption } from './OptionPicker';
