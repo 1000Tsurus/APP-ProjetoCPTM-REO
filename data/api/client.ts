@@ -17,6 +17,8 @@ export type ClientHooks = {
   getAccessToken(): string | null;
   refresh(): Promise<boolean>;
   onSessionExpired(): void;
+  /** Opcional: `false` quando uma requisição falha por rede; `true` quando qualquer resposta HTTP chega. */
+  onNetwork?(ok: boolean): void;
 };
 
 /** Erro devolvido pela API (formato `{detail, code}`; 422 traz `errors`). */
@@ -87,6 +89,8 @@ async function send(method: Method, path: string, body: unknown, auth: boolean):
       body: body === undefined ? undefined : JSON.stringify(body),
       signal: controller.signal,
     });
+    // Qualquer resposta HTTP (mesmo 4xx/5xx) prova que o servidor está alcançável.
+    hooks.onNetwork?.(true);
     const text = await response.text();
     let data: unknown = undefined;
     let parsed = true;
@@ -104,6 +108,7 @@ async function send(method: Method, path: string, body: unknown, auth: boolean):
   } catch (e) {
     if (e instanceof ApiError) throw e;
     // Qualquer outra falha (TypeError do fetch, abort por timeout) é de rede.
+    hooks.onNetwork?.(false);
     throw new NetworkError();
   } finally {
     clearTimeout(timer);

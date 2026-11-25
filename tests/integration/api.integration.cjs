@@ -9,6 +9,15 @@ const test = require('node:test');
 const { load, memory } = require('../helpers/load.cjs');
 
 const BASE = (process.env.REO_API_URL || 'http://127.0.0.1:4000').replace(/\/+$/, '');
+
+// Este teste cria dormentes e registros: só roda contra API local, a menos que se autorize.
+const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+if (!LOCAL_HOSTS.has(new URL(BASE).hostname) && process.env.REO_API_ALLOW_REMOTE !== '1') {
+  throw new Error(
+    `REO_API_URL aponta para um host remoto (${new URL(BASE).hostname}). ` +
+      'O teste grava dados; defina REO_API_ALLOW_REMOTE=1 se for mesmo isso.',
+  );
+}
 const ENV_FILE = process.env.REO_API_ENV_FILE || path.join(__dirname, '..', '..', '..', 'cptm-reo-api', '.env');
 
 /** Lê KEY=valor de um arquivo .env simples (sem expandir variáveis). */

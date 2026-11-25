@@ -47,15 +47,36 @@ function notify(): void {
   }
 }
 
+const preserved = new Set<string>();
+
+/** Guarda uma cópia do valor ilegível antes de a fila ser recriada (nunca perde dado em silêncio). */
+async function preserveCorrupt(userId: string, raw: string): Promise<void> {
+  // Uma cópia por valor: leituras repetidas antes da próxima gravação não multiplicam cópias.
+  const id = `${userId}|${raw}`;
+  if (preserved.has(id)) return;
+  preserved.add(id);
+  try {
+    await AsyncStorage.setItem(`${keyOf(userId)}.corrupt.${new Date().toISOString()}`, raw);
+  } catch {
+    // Sem espaço para a cópia: ainda assim a fila segue funcionando.
+  }
+}
+
+/**
+ * Lê a fila. Valor ilegível (JSON inválido ou não-array) é tratado como vazio, mas só depois de
+ * copiado para `reo.outbox.<id>.corrupt.<ISO>`; a próxima gravação sobrescreve a chave original.
+ */
 async function read(userId: string): Promise<OutboxItem[]> {
   const raw = await AsyncStorage.getItem(keyOf(userId));
   if (!raw) return [];
   try {
     const parsed: unknown = JSON.parse(raw);
-    return Array.isArray(parsed) ? (parsed as OutboxItem[]) : [];
+    if (Array.isArray(parsed)) return parsed as OutboxItem[];
   } catch {
-    return [];
+    // cai na preservação abaixo
   }
+  await preserveCorrupt(userId, raw);
+  return [];
 }
 
 /**

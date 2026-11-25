@@ -196,3 +196,52 @@ test('canFieldWork e canInspect por papel', () => {
   assert.equal(store.canInspect('supervisor'), false);
   for (const r of ['tecnico', 'especialista', 'admin']) assert.equal(store.canInspect(r), true);
 });
+
+test('hook onNetwork: com sessão online, falha de rede vira offline e resposta volta a online', async () => {
+  const { store, client } = setup(async () => tokens('tecnico'));
+  await store.login('RL-1', 'x');
+  const hooks = client.hooks();
+  hooks.onNetwork(false);
+  assert.equal(store.getState().status, 'offline');
+  assert.equal(store.currentUser().id, 'u-1');
+  hooks.onNetwork(true);
+  assert.equal(store.getState().status, 'online');
+  assert.equal(store.currentUser().role, 'tecnico');
+});
+
+test('hook onNetwork: sem usuário não altera signed_out', async () => {
+  const { store, client } = setup(async () => tokens('tecnico'));
+  client.hooks().onNetwork(false);
+  assert.equal(store.getState().status, 'signed_out');
+  client.hooks().onNetwork(true);
+  assert.equal(store.getState().status, 'signed_out');
+});
+
+test('hook onNetwork: offline sem access token só volta a online pelo refresh', async () => {
+  const seed = { refresh_token: 'ref-old', refresh_expires_at: FUTURE, user: user() };
+  const { store, client } = setup(async (m, p, b, o, { NetworkError }) => { throw new NetworkError(); }, seed);
+  await store.restore();
+  client.hooks().onNetwork(true); // resposta 401 da API sem token não prova sessão válida
+  assert.equal(store.getState().status, 'offline');
+});
+
+test('com o cliente real: NetworkError numa requisição derruba para offline e a resposta seguinte volta a online', async () => {
+  const secure = fakeSecureStore();
+  secure.values.set(SESSION_KEY, JSON.stringify({ refresh_token: 'r', refresh_expires_at: FUTURE, user: user() }));
+  let down = false;
+  const fakeFetch = async (url) => {
+    if (down) throw new TypeError('Network request failed');
+    if (url.endsWith('/auth/refresh')) return { status: 200, text: async () => JSON.stringify(tokens('operador')) };
+    return { status: 200, text: async () => JSON.stringify({ ok: 1 }) };
+  };
+  const clientMod = load('data/api/client.ts', { '../config': { API_URL: 'http://api.test' } }, { fetch: fakeFetch });
+  const store = load('data/auth-store.ts', { './api/client': clientMod, 'expo-secure-store': secure });
+  assert.equal((await store.restore()).status, 'online');
+  down = true;
+  await assert.rejects(clientMod.request('GET', '/sincronizacao/status'), (e) => e.name === 'NetworkError');
+  assert.equal(store.getState().status, 'offline');
+  assert.equal(store.currentUser().id, 'u-1');
+  down = false;
+  await clientMod.request('GET', '/sincronizacao/status');
+  assert.equal(store.getState().status, 'online');
+});

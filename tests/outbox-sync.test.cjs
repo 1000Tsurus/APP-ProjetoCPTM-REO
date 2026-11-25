@@ -230,10 +230,15 @@ test('enqueue durante o sync não se perde', async () => {
   const gate = new Promise((r) => { release = r; });
   let entered;
   const started = new Promise((r) => { entered = r; });
+  let first = true;
   const { outbox, sync } = setup(async (m, p, body) => {
-    entered();
-    await gate;
-    return acceptAll(m, p, body);
+    if (first) {
+      first = false;
+      entered();
+      await gate;
+      return acceptAll(m, p, body);
+    }
+    return { results: [] }; // a rodada extra não confirma nada: o item novo precisa seguir na fila
   });
   await outbox.enqueue('u1', item());
   const running = sync.syncNow('u1');
@@ -241,7 +246,7 @@ test('enqueue durante o sync não se perde', async () => {
   const late = item();
   await outbox.enqueue('u1', late);
   release();
-  assert.deepEqual(plain(await running), { sent: 1, accepted: 1, rejected: 0 });
+  assert.deepEqual(plain(await running), { sent: 2, accepted: 1, rejected: 0 });
   const list = await outbox.listOutbox('u1');
   assert.equal(list.length, 1);
   assert.equal(list[0].client_uuid, late.client_uuid);
@@ -254,4 +259,78 @@ test('deviceId gera uma vez e reaproveita', async () => {
   const b = await sync.deviceId();
   assert.equal(a, b);
   assert.equal(storage.values.get('reo.device_id'), a);
+});
+
+test('item novo durante o sync é enviado numa rodada extra (um save que recebeu busy não fica parado)', async () => {
+  let release;
+  const gate = new Promise((r) => { release = r; });
+  let entered;
+  const started = new Promise((r) => { entered = r; });
+  let first = true;
+  const { outbox, sync, calls } = setup(async (m, p, body) => {
+    if (first) { first = false; entered(); await gate; }
+    return acceptAll(m, p, body);
+  });
+  await outbox.enqueue('u1', item());
+  const running = sync.syncNow('u1');
+  await started;
+  await outbox.enqueue('u1', item());
+  assert.equal(await sync.syncNow('u1'), 'busy');
+  release();
+  assert.deepEqual(plain(await running), { sent: 2, accepted: 2, rejected: 0 });
+  assert.equal(calls.length, 2);
+  assert.equal(await outbox.pendingCount('u1'), 0);
+});
+
+test('rodada extra é só uma: item que entra durante ela espera o próximo sync', async () => {
+  let n = 0;
+  const gates = [];
+  const { outbox, sync, calls } = setup(async (m, p, body) => {
+    n += 1;
+    if (n <= 2) await new Promise((r) => { gates.push(r); });
+    return acceptAll(m, p, body);
+  });
+  await outbox.enqueue('u1', item());
+  const running = sync.syncNow('u1');
+  await new Promise((r) => setImmediate(r));
+  await outbox.enqueue('u1', item());
+  gates.shift()();
+  await new Promise((r) => setImmediate(r));
+  await new Promise((r) => setImmediate(r));
+  await outbox.enqueue('u1', item());
+  gates.shift()();
+  await running;
+  assert.equal(calls.length, 2);
+  assert.equal(await outbox.pendingCount('u1'), 1);
+});
+
+test('deviceId concorrente devolve o mesmo valor', async () => {
+  const { sync, storage } = setup(acceptAll);
+  const [a, b, c] = await Promise.all([sync.deviceId(), sync.deviceId(), sync.deviceId()]);
+  assert.equal(a, b);
+  assert.equal(b, c);
+  assert.equal(storage.values.get('reo.device_id'), a);
+});
+
+test('fila corrompida é copiada para reo.outbox.<id>.corrupt.<ISO> antes de ser recriada', async () => {
+  const storage = memory();
+  storage.values.set('reo.outbox.u1', '{nao-e-json');
+  const { outbox } = setup(acceptAll, storage);
+  await outbox.enqueue('u1', item());
+  const copies = [...storage.values.keys()].filter((k) => k.startsWith('reo.outbox.u1.corrupt.'));
+  assert.equal(copies.length, 1);
+  assert.equal(storage.values.get(copies[0]), '{nao-e-json');
+  assert.equal((await outbox.listOutbox('u1')).length, 1);
+  assert.equal((await outbox.listOutbox('u1')).length, 1);
+  assert.equal([...storage.values.keys()].filter((k) => k.includes('.corrupt.')).length, 1);
+});
+
+test('fila que não é array também é preservada', async () => {
+  const storage = memory();
+  storage.values.set('reo.outbox.u1', '{"a":1}');
+  const { outbox } = setup(acceptAll, storage);
+  await outbox.enqueue('u1', item());
+  const copies = [...storage.values.keys()].filter((k) => k.startsWith('reo.outbox.u1.corrupt.'));
+  assert.equal(copies.length, 1);
+  assert.equal(storage.values.get(copies[0]), '{"a":1}');
 });

@@ -41,6 +41,8 @@ export default function InspectScreen() {
   const tag = normalizeTag(Array.isArray(params.tag) ? params.tag[0] : (params.tag ?? ''));
   // Gerados uma vez ao abrir: o cronômetro vira duration_seconds e o UUID evita duplicar no toque duplo.
   const clientUuid = useRef(uuidv4()).current;
+  // Trava síncrona contra toque duplo (o estado `saving` só muda no próximo render).
+  const submitting = useRef(false);
   const startedAt = useRef(new Date()).current;
 
   const [species, setSpecies] = useState<SpeciesRead[]>([]);
@@ -72,7 +74,7 @@ export default function InspectScreen() {
   if (!canInspect(user.role)) return <Redirect href={`/dormente/${encodeURIComponent(tag)}` as Href} />;
 
   async function save() {
-    if (saving || !user) return;
+    if (submitting.current || saving || !user) return;
     if (!conservation || !cracks || !biological || !moisture || !result) {
       setError('Preencha conservação, rachaduras, ataque biológico, umidade e resultado.');
       return;
@@ -98,6 +100,7 @@ export default function InspectScreen() {
       return;
     }
     setError(null);
+    submitting.current = true;
     setSaving(true);
     try {
       const message = await saveToQueue(user.id, {
@@ -110,6 +113,7 @@ export default function InspectScreen() {
       finishAndLeave(router, message, `/dormente/${encodeURIComponent(tag)}` as Href);
     } catch {
       setError('Não foi possível gravar no aparelho. Tente de novo.');
+      submitting.current = false;
       setSaving(false);
     }
   }

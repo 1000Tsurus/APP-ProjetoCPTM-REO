@@ -5,6 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Badge, Banner, Button, EmptyState, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
+import { errorMessage } from '@/data/api/client';
 import { useSession } from '@/contexts/SessionContext';
 import { discard, listOutbox, subscribeOutbox, type OutboxItem } from '@/data/outbox';
 import { useSync } from '@/data/use-sync';
@@ -67,7 +68,6 @@ export default function QueueScreen() {
   let note: string | null = null;
   if (tapped && !syncing) {
     if (lastResult === 'offline') note = 'Sem conexão — tente de novo quando houver rede.';
-    else if (lastResult === 'busy') note = 'Envio já em andamento.';
     else if (lastResult && lastResult.sent === 0) note = 'Nada para enviar.';
     else if (lastResult) note = `Enviados: ${lastResult.sent} (aceitos ${lastResult.accepted}, rejeitados ${lastResult.rejected}).`;
   }
@@ -76,7 +76,10 @@ export default function QueueScreen() {
     if (!user) return;
     Alert.alert('Descartar este registro?', 'Ele não será enviado e não poderá ser recuperado.', [
       { text: 'Cancelar', style: 'cancel' },
-      { text: 'Descartar', style: 'destructive', onPress: () => void discard(user.id, item.client_uuid) },
+      { text: 'Descartar', style: 'destructive', onPress: () => {
+          discard(user.id, item.client_uuid).catch((e) => Alert.alert('Não foi possível descartar', errorMessage(e)));
+        },
+      },
     ]);
   }
 

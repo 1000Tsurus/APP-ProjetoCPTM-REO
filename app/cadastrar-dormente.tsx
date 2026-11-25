@@ -1,4 +1,4 @@
-import { type Href, useLocalSearchParams, useRouter } from 'expo-router';
+import { type Href, Redirect, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +9,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { ApiError, errorMessage, NetworkError } from '@/data/api/client';
 import { createSleeper } from '@/data/api/endpoints';
 import type { LocationRead, SleeperCreate, SpeciesRead } from '@/data/api/types';
+import { canFieldWork } from '@/data/auth-store';
 import { getLocations, getSpecies } from '@/data/catalog-cache';
 import { fieldFromErrors, parseLength, parseYear, type SleeperFormField } from '@/data/sleeper-form';
 import { isValidTag, normalizeTag } from '@/data/tag';
@@ -22,11 +23,13 @@ const orNull = (v: string) => (v.trim() === '' ? null : v.trim());
 /** Cadastro de dormente (online): tag pré-preenchida, espécie/local dos catálogos e validação antes de enviar. */
 export default function RegisterSleeperScreen() {
   const router = useRouter();
-  const { offline } = useSession();
+  const { user, offline } = useSession();
   const params = useLocalSearchParams<{ tag?: string }>();
   const initialTag = normalizeTag(Array.isArray(params.tag) ? params.tag[0] : (params.tag ?? ''));
   // Gerado uma vez ao abrir: toque duplo em "Cadastrar" não cria dois dormentes.
   const clientUuid = useRef(uuidv4()).current;
+  // Trava síncrona contra toque duplo (o estado `saving` só muda no próximo render).
+  const submitting = useRef(false);
 
   const [species, setSpecies] = useState<SpeciesRead[]>([]);
   const [locations, setLocations] = useState<LocationRead[]>([]);
@@ -59,6 +62,12 @@ export default function RegisterSleeperScreen() {
     };
   }, []);
 
+  if (!user) return null;
+  // Supervisor só consulta: não cadastra dormente.
+  if (!canFieldWork(user.role)) {
+    return <Redirect href={(initialTag ? `/dormente/${encodeURIComponent(initialTag)}` : '/') as Href} />;
+  }
+
   /** Valida no cliente e devolve o corpo do POST, ou null se houver erro (já exibido). */
   function buildBody(): SleeperCreate | null {
     const next: Errors = {};
@@ -87,11 +96,12 @@ export default function RegisterSleeperScreen() {
   }
 
   async function submit() {
-    if (saving) return;
+    if (submitting.current || saving) return;
     setMessage(null);
     setTakenTag(null);
     const body = buildBody();
     if (!body) return;
+    submitting.current = true;
     setSaving(true);
     try {
       const { sleeper } = await createSleeper(body);
@@ -109,6 +119,7 @@ export default function RegisterSleeperScreen() {
       } else {
         setMessage(errorMessage(e));
       }
+      submitting.current = false;
       setSaving(false);
     }
   }

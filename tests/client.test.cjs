@@ -144,3 +144,20 @@ test('errorMessage traduz os erros', async () => {
   assert.equal(mod.errorMessage(new mod.NetworkError()), 'Sem conexão com o servidor.');
   assert.equal(mod.errorMessage(new Error('x')), 'Erro inesperado.');
 });
+
+test('onNetwork: false em falha de rede e true em qualquer resposta HTTP', async () => {
+  const seen = [];
+  let n = 0;
+  const mod = load('data/api/client.ts', { '../config': { API_URL: 'http://api.test' } }, {
+    fetch: async () => {
+      n += 1;
+      if (n === 1) throw new TypeError('x');
+      return n === 2 ? res(500, { detail: 'd', code: 'c' }) : res(200, { ok: 1 });
+    },
+  });
+  mod.configureClient({ getAccessToken: () => 't', refresh: async () => false, onSessionExpired: () => {}, onNetwork: (ok) => seen.push(ok) });
+  await assert.rejects(mod.request('GET', '/a'), (e) => e.name === 'NetworkError');
+  await assert.rejects(mod.request('GET', '/a'), (e) => e.status === 500);
+  await mod.request('GET', '/a');
+  assert.deepEqual(seen, [false, true, true]);
+});

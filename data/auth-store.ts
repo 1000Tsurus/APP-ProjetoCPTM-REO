@@ -73,9 +73,23 @@ async function expireSession(): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_KEY);
 }
 
+/**
+ * Acompanha a conectividade real enquanto há usuário: falha de rede → offline; resposta do
+ * servidor → online. Sem access token (reaberto offline) só o refresh bem-sucedido volta a
+ * online, porque a resposta 401 a uma chamada sem token não prova uma sessão válida.
+ */
+function handleNetwork(ok: boolean): void {
+  if (state.status === 'signed_out') return;
+  if (ok && accessToken === null) return;
+  const status = ok ? 'online' : 'offline';
+  if (state.status === status) return;
+  setState({ status, user: state.user });
+}
+
 configureClient({
   getAccessToken: () => accessToken,
   refresh: refreshTokens,
+  onNetwork: handleNetwork,
   onSessionExpired: () => {
     void expireSession();
   },

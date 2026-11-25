@@ -95,6 +95,7 @@ export default function SleepersScreen() {
               autoCorrect={false}
               value={search}
               onChangeText={setSearch}
+              maxLength={64}
               returnKeyType="search"
             />
             <View style={styles.chips}>

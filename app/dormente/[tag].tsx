@@ -150,13 +150,17 @@ export default function SleeperScreen() {
           <Panel style={styles.panel}>
             <SectionTitle icon="help-circle-outline" title="Tag não cadastrada" />
             <Text style={styles.text}>Nenhum dormente usa esta tag.</Text>
-            <Button
-              title="Cadastrar dormente"
-              icon="add-circle-outline"
-              disabled={offline}
-              onPress={() => router.push(`/cadastrar-dormente?tag=${encoded}` as Href)}
-            />
-            {offline ? <Text style={styles.note}>O cadastro exige conexão.</Text> : null}
+            {role && canFieldWork(role) ? (
+              <>
+                <Button
+                  title="Cadastrar dormente"
+                  icon="add-circle-outline"
+                  disabled={offline}
+                  onPress={() => router.push(`/cadastrar-dormente?tag=${encoded}` as Href)}
+                />
+                {offline ? <Text style={styles.note}>O cadastro exige conexão.</Text> : null}
+              </>
+            ) : null}
           </Panel>
         ) : null}
 

@@ -25,6 +25,8 @@ export default function MoveScreen() {
   const tag = normalizeTag(Array.isArray(params.tag) ? params.tag[0] : (params.tag ?? ''));
   // Gerado uma vez ao abrir: toque duplo em "Salvar" não duplica o registro.
   const clientUuid = useRef(uuidv4()).current;
+  // Trava síncrona contra toque duplo (o estado `saving` só muda no próximo render).
+  const submitting = useRef(false);
 
   const [locations, setLocations] = useState<LocationRead[]>([]);
   const [kind, setKind] = useState<MovementKind>('transfer');
@@ -52,7 +54,7 @@ export default function MoveScreen() {
   const withdrawal = kind === 'withdrawal';
 
   async function save() {
-    if (saving || !user) return;
+    if (submitting.current || saving || !user) return;
     const target = locations.find((l) => l.id === locationId);
     const built = buildMovement({
       tag,
@@ -69,6 +71,7 @@ export default function MoveScreen() {
       return;
     }
     setError(null);
+    submitting.current = true;
     setSaving(true);
     try {
       const message = await saveToQueue(user.id, {
@@ -81,6 +84,7 @@ export default function MoveScreen() {
       finishAndLeave(router, message, `/dormente/${encodeURIComponent(tag)}` as Href);
     } catch {
       setError('Não foi possível gravar no aparelho. Tente de novo.');
+      submitting.current = false;
       setSaving(false);
     }
   }

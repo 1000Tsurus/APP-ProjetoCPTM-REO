@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href, Redirect, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -26,6 +26,8 @@ export function OccurrenceForm({ tag: fixedTag }: { tag?: string }) {
   const { user, offline } = useSession();
   // Gerado uma vez ao abrir: toque duplo em "Salvar" não duplica o registro.
   const clientUuid = useRef(uuidv4()).current;
+  // Trava síncrona contra toque duplo (o estado `saving` só muda no próximo render).
+  const submitting = useRef(false);
 
   const [locations, setLocations] = useState<LocationRead[]>([]);
   const [typedTag, setTypedTag] = useState('');
@@ -47,20 +49,26 @@ export function OccurrenceForm({ tag: fixedTag }: { tag?: string }) {
     };
   }, []);
 
-  if (!user || !canFieldWork(user.role)) return null;
+  if (!user) return null;
+  // Supervisor só consulta: leva de volta ao dormente (ou ao Início) em vez de tela em branco.
+  if (!canFieldWork(user.role)) {
+    const back = fixedTag ? `/dormente/${encodeURIComponent(normalizeTag(fixedTag))}` : '/';
+    return <Redirect href={back as Href} />;
+  }
 
   const tag = normalizeTag(fixedTag ?? typedTag);
   // Sem tag fixa, volta ao Início (raiz); com tag, à tela do dormente.
   const leaveTo = (fixedTag ? `/dormente/${encodeURIComponent(tag)}` : '/') as Href;
 
   async function save() {
-    if (saving || !user) return;
+    if (submitting.current || saving || !user) return;
     const built = buildOccurrence({ tag, locationId, kind, description, clientUuid, now: new Date() });
     if (built.error !== undefined) {
       setError(built.error);
       return;
     }
     setError(null);
+    submitting.current = true;
     setSaving(true);
     try {
       const message = await saveToQueue(user.id, {
@@ -73,6 +81,7 @@ export function OccurrenceForm({ tag: fixedTag }: { tag?: string }) {
       finishAndLeave(router, message, leaveTo);
     } catch {
       setError('Não foi possível gravar no aparelho. Tente de novo.');
+      submitting.current = false;
       setSaving(false);
     }
   }

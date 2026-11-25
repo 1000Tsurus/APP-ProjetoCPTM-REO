@@ -5,7 +5,8 @@ import { useSession } from '@/contexts/SessionContext';
 import { listOutbox, subscribeOutbox } from './outbox';
 import { syncNow as runSync, type SyncSummary } from './sync';
 
-export type SyncResult = SyncSummary | 'offline' | 'busy' | null;
+/** 'busy' nunca é guardado aqui: quem recebe 'busy' deixa o resultado para a sincronização em curso. */
+export type SyncResult = SyncSummary | 'offline' | null;
 
 /**
  * Estado da fila e disparo da sincronização. Sincroniza ao montar e quando o app volta para

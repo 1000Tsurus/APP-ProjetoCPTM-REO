@@ -28,7 +28,7 @@ function confirmLeave(pending: number): Promise<boolean> {
   return new Promise((resolve) => {
     Alert.alert(
       'Sair da conta',
-      `Há ${pending} registros não enviados. Eles ficam guardados neste aparelho até você entrar de novo.`,
+      `${pending === 1 ? 'Há 1 registro não enviado' : `Há ${pending} registros não enviados`}. ${pending === 1 ? 'Ele fica guardado' : 'Eles ficam guardados'} neste aparelho até você entrar de novo.`,
       [
         { text: 'Cancelar', style: 'cancel', onPress: () => resolve(false) },
         { text: 'Sair', style: 'destructive', onPress: () => resolve(true) },

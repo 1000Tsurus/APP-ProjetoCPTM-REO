@@ -1,11 +1,12 @@
-import { type Href, useRouter } from 'expo-router';
-import { type ComponentRef, useEffect, useRef, useState } from 'react';
+import { type Href, useFocusEffect, useRouter } from 'expo-router';
+import { type ComponentRef, useCallback, useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, Text, type TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Banner, Button, Field, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useSession } from '@/contexts/SessionContext';
+import { canFieldWork } from '@/data/auth-store';
 import { getSyncStatus } from '@/data/api/endpoints';
 import { deviceId } from '@/data/sync';
 import { isValidTag, normalizeTag } from '@/data/tag';
@@ -14,16 +15,30 @@ import { useSync } from '@/data/use-sync';
 /** Início: leitura da tag (campo com foco para o leitor em modo teclado), pendências e último sync. */
 export default function HomeScreen() {
   const router = useRouter();
-  const { offline } = useSession();
+  const { offline, user } = useSession();
   const { pending, syncing, lastResult } = useSync();
   const [tag, setTag] = useState('');
   const [tagError, setTagError] = useState<string | null>(null);
   const [lastSync, setLastSync] = useState<string | null>(null);
+  // Conta cada vez que o Início volta a ficar em foco (reabre a sonda de conexão abaixo).
+  const [focusTick, setFocusTick] = useState(0);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
 
-  // Último lote recebido pelo servidor; recarrega quando uma sincronização termina.
+  // O Início continua montado enquanto /dormente/[tag] está empilhado, então `autoFocus` só vale
+  // no primeiro mount: devolve o foco ao campo sempre que a tela volta ao primeiro plano.
+  useFocusEffect(
+    useCallback(() => {
+      setFocusTick((n) => n + 1);
+      const timer = setTimeout(() => inputRef.current?.focus(), 50);
+      return () => clearTimeout(timer);
+    }, []),
+  );
+
+  // Último lote recebido pelo servidor; recarrega quando uma sincronização termina. Esta
+  // chamada também serve de sonda de conexão: o cliente marca online/offline conforme a
+  // resposta, então não há atalho para `offline` (erro de rede aqui é tratado em silêncio).
   useEffect(() => {
-    if (offline || syncing) return;
+    if (syncing) return;
     let alive = true;
     (async () => {
       try {
@@ -36,10 +51,15 @@ export default function HomeScreen() {
     return () => {
       alive = false;
     };
-  }, [offline, syncing, lastResult]);
+  }, [offline, syncing, lastResult, focusTick]);
 
   function submit(raw: string) {
     const value = normalizeTag(raw);
+    // Leitor que termina com CR+LF pode mandar um submit vazio: ignora sem reclamar.
+    if (value === '') {
+      inputRef.current?.focus();
+      return;
+    }
     if (!isValidTag(value)) {
       setTagError('Tag inválida.');
       // O leitor termina cada leitura com Enter: o foco precisa ficar no campo.
@@ -93,12 +113,14 @@ export default function HomeScreen() {
           </Text>
         </Panel>
 
-        <Button
-          title="Registrar ocorrência sem dormente"
-          variant="ghost"
-          icon="alert-circle-outline"
-          onPress={() => router.push('/ocorrencia' as Href)}
-        />
+        {user && canFieldWork(user.role) ? (
+          <Button
+            title="Registrar ocorrência sem dormente"
+            variant="ghost"
+            icon="alert-circle-outline"
+            onPress={() => router.push('/ocorrencia' as Href)}
+          />
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
