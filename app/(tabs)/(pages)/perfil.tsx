@@ -1,22 +1,45 @@
+import { type Href, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Button, Label, Panel } from '@/components/ui';
+import { Badge, Banner, Button, Label, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useSession } from '@/contexts/SessionContext';
+import { label, ROLE_LABEL } from '@/data/labels';
+import { useSync } from '@/data/use-sync';
 
-// Provisório: a Task 8 acrescenta papel, fila e sincronização.
+/** Perfil: dados do usuário, situação da fila, sincronização manual e saída. */
 export default function ProfileScreen() {
-  const { user, signOut } = useSession();
+  const router = useRouter();
+  const { user, offline, signOut } = useSession();
+  const { pending, rejected, syncing, syncNow } = useSync();
+
   return (
     <SafeAreaView style={styles.screen}>
+      {offline ? <Banner tone="warn" text="Sem conexão" /> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <Panel style={styles.panel}>
           <Label>Nome</Label>
           <Text style={styles.text}>{user?.name}</Text>
           <Label>Matrícula</Label>
           <Text style={[styles.text, { fontFamily: FONT_CODE }]}>{user?.registration}</Text>
+          <Label>Papel</Label>
+          {user ? <Badge text={label(ROLE_LABEL, user.role)} tone="info" /> : null}
         </Panel>
+
+        <Panel style={styles.panel}>
+          <SectionTitle icon="cloud-upload-outline" title="Fila de envio" />
+          <Text style={styles.text}>Pendentes: {pending}</Text>
+          <Text style={styles.text}>Rejeitados: {rejected}</Text>
+          <Button title="Ver fila" variant="ghost" small onPress={() => router.push('/fila' as Href)} />
+        </Panel>
+
+        <Button
+          title={syncing ? 'Sincronizando...' : 'Sincronizar agora'}
+          icon="sync-outline"
+          disabled={syncing}
+          onPress={() => void syncNow()}
+        />
         <Button title="Sair" variant="ghost" icon="log-out-outline" onPress={() => void signOut()} />
       </ScrollView>
     </SafeAreaView>

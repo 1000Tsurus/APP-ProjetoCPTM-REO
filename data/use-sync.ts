@@ -24,6 +24,8 @@ export function useSync(): {
   const [lastResult, setLastResult] = useState<SyncResult>(null);
   const [syncing, setSyncing] = useState(false);
   const mounted = useRef(true);
+  // Chamadas em andamento deste hook: 'busy' devolve na hora, mas a primeira sync segue rodando.
+  const inFlight = useRef(0);
 
   useEffect(() => {
     mounted.current = true;
@@ -45,17 +47,25 @@ export function useSync(): {
 
   const syncNow = useCallback(async () => {
     if (!userId) return;
+    inFlight.current += 1;
     setSyncing(true);
     try {
       const result = await runSync(userId);
-      if (mounted.current) setLastResult(result);
+      // 'busy' não é resultado: outra sincronização está rodando e vai informar o dela.
+      if (mounted.current && result !== 'busy') setLastResult(result);
     } catch {
       // Falha inesperada: a fila não foi alterada; o próximo disparo tenta de novo.
     } finally {
-      if (mounted.current) setSyncing(false);
+      inFlight.current -= 1;
+      if (mounted.current) setSyncing(inFlight.current > 0);
       await refreshCounts();
     }
   }, [userId, refreshCounts]);
+
+  // Resultado da sync é do usuário anterior: zera ao trocar de usuário.
+  useEffect(() => {
+    setLastResult(null);
+  }, [userId]);
 
   useEffect(() => {
     void refreshCounts();
