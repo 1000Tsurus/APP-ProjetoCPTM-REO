@@ -2,7 +2,7 @@ import { type Href, useRouter } from 'expo-router';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Banner, Button, Label, Panel, SectionTitle } from '@/components/ui';
+import { Badge, Button, Label, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useSession } from '@/contexts/SessionContext';
 import { label, ROLE_LABEL } from '@/data/labels';
@@ -11,12 +11,11 @@ import { useSync } from '@/data/use-sync';
 /** Perfil: dados do usuário, situação da fila, sincronização manual e saída. */
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, offline, signOut } = useSession();
+  const { user, signOut } = useSession();
   const { pending, rejected, syncing, syncNow } = useSync();
 
   return (
     <SafeAreaView style={styles.screen}>
-      {offline ? <Banner tone="warn" text="Sem conexão" /> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <Panel style={styles.panel}>
           <Label>Nome</Label>

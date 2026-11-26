@@ -35,7 +35,7 @@ const SPECIES_OPTIONS = [
 /** Checklist de inspeção (técnico, especialista, admin) gravado na fila; mede o tempo desde a abertura. */
 export default function InspectScreen() {
   const router = useRouter();
-  const { user, offline } = useSession();
+  const { user } = useSession();
   const params = useLocalSearchParams<{ tag: string }>();
   const tag = normalizeTag(Array.isArray(params.tag) ? params.tag[0] : (params.tag ?? ''));
   // Gerados uma vez ao abrir: o cronômetro vira duration_seconds e o UUID evita duplicar no toque duplo.
@@ -119,7 +119,6 @@ export default function InspectScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      {offline ? <Banner tone="warn" text="Sem conexão — será enviado depois" /> : null}
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />

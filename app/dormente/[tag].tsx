@@ -119,7 +119,6 @@ export default function SleeperScreen() {
 
   return (
     <SafeAreaView style={styles.screen}>
-      {offline ? <Banner tone="warn" text="Sem conexão" /> : null}
       <ScrollView contentContainerStyle={styles.content}>
         <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />
         <Text style={[styles.tag, { fontFamily: FONT_CODE }]}>{tag}</Text>
