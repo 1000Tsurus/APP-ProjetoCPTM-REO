@@ -119,7 +119,7 @@ async function processOne(userId: string, item: OutboxItem, now: Date): Promise<
  * Envia os cadastros e resolve as leituras pendentes ANTES do replicar, porque a sincronização
  * não cria dormentes. Só pega itens pendentes fora da espera, do mais antigo ao mais novo.
  * Rede fora → 'offline' (itens ficam); erro da API → item rejeitado com `code`/`detail`, sem
- * novas tentativas. 401 sobe para o chamador: a sessão expirou, o item não tem culpa.
+ * novas tentativas. 401 e 5xx sobem para o chamador: são passageiros, o item continua pendente.
  */
 export async function sendRegistrations(userId: string, now: Date): Promise<RegistrationSummary | 'offline'> {
   const work = (await listOutbox(userId))
@@ -132,7 +132,8 @@ export async function sendRegistrations(userId: string, now: Date): Promise<Regi
       summary[await processOne(userId, item, now)] += 1;
     } catch (e) {
       if (e instanceof NetworkError) return 'offline';
-      if (!(e instanceof ApiError) || e.status === 401) throw e;
+      // 401 (sessão) e 5xx (servidor) são passageiros: o item fica pendente e o erro sobe.
+      if (!(e instanceof ApiError) || e.status === 401 || e.status >= 500) throw e;
       await reject(userId, item, e.code, e.detail);
       summary.rejected += 1;
     }

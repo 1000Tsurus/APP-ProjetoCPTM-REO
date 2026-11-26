@@ -232,3 +232,12 @@ test('lastSyncAt grava após sync bem-sucedida e não grava quando offline', asy
   assert.equal(await off.sync.syncNow('u1'), 'offline');
   assert.equal(await off.sync.lastSyncAt('u1'), null);
 });
+
+test('erro 500 no cadastro mantém o item pendente', async () => {
+  const { outbox, sync } = setup(async () => { throw new ApiError(500, 'http_500', 'Erro do servidor.'); });
+  await outbox.enqueue('u1', registerItem());
+  await assert.rejects(sync.syncNow('u1'));
+  const [m] = await outbox.listOutbox('u1');
+  assert.equal(m.status, 'pending');
+  assert.equal(m.type, 'register');
+});
