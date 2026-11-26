@@ -10,7 +10,13 @@ import { useSession } from '@/contexts/SessionContext';
 import { discard, listOutbox, subscribeOutbox, type OutboxItem } from '@/data/outbox';
 import { useSync } from '@/data/use-sync';
 
-const TYPE_LABEL = { movement: 'Movimentação', inspection: 'Inspeção', occurrence: 'Ocorrência' } as const;
+const TYPE_LABEL = {
+  movement: 'Movimentação',
+  inspection: 'Inspeção',
+  occurrence: 'Ocorrência',
+  register: 'Cadastro',
+  resolve: 'Leitura',
+} as const;
 
 /** Linha de um item da fila; rejeitado mostra o motivo e só permite descartar. */
 function QueueRow({ item, onDiscard }: { item: OutboxItem; onDiscard?: () => void }) {

@@ -102,6 +102,15 @@ export type SleeperCreate = {
   client_uuid?: string | null;
 };
 
+/** Leitura de tag desconhecida feita offline; o sync a resolve em movimento ou cadastro pendente. */
+export type ResolvePayload = {
+  rfid_tag: string;
+  to_location_id: string;
+  location_name: string;
+  occurred_at: string;
+  client_uuid: string;
+};
+
 /** Referência ao dormente: informar `rfid_tag` ou `sleeper_id`. */
 export type SleeperRef = { rfid_tag?: string | null; sleeper_id?: string | null };
 

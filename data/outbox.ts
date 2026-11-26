@@ -1,19 +1,27 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { InspectionCreate, MovementCreate, OccurrenceCreate } from './api/types';
+import type {
+  InspectionCreate,
+  MovementCreate,
+  OccurrenceCreate,
+  ResolvePayload,
+  SleeperCreate,
+} from './api/types';
 
-export type OutboxType = 'movement' | 'inspection' | 'occurrence';
+export type OutboxType = 'movement' | 'inspection' | 'occurrence' | 'register' | 'resolve';
 
 export type OutboxItem = {
   type: OutboxType;
   /** UUID v4 gerado uma vez pela tela; é a chave de idempotência no servidor. */
   client_uuid: string;
   /** Corpo já no formato do POST da API (contém o mesmo `client_uuid`). */
-  payload: MovementCreate | InspectionCreate | OccurrenceCreate;
+  payload: MovementCreate | InspectionCreate | OccurrenceCreate | SleeperCreate | ResolvePayload;
   rfid_tag: string | null;
   /** Texto curto para a tela Fila (ex.: "Entrada · RM 123"). */
   summary: string;
   created_at: string;
   status: 'pending' | 'rejected';
+  /** ISO até quando o item espera para o operador poder desfazer; o sync não o envia antes. */
+  hold_until?: string;
   /** Preenchidos quando o servidor rejeita o item. */
   code?: string;
   reason?: string;
@@ -100,11 +108,51 @@ export function mutateOutbox(
   return next;
 }
 
-/** Grava o item na fila; se o `client_uuid` já existe, não faz nada (toque duplo em "Salvar"). */
-export function enqueue(userId: string, item: NewOutboxItem): Promise<void> {
+/**
+ * Grava o item na fila; se o `client_uuid` já existe, não faz nada (toque duplo em "Salvar").
+ * Com `holdMs`, o item fica em espera até `now + holdMs` para o operador poder desfazer.
+ */
+export function enqueue(
+  userId: string,
+  item: NewOutboxItem,
+  opts: { holdMs?: number; now?: Date } = {},
+): Promise<void> {
+  const now = opts.now ?? new Date();
   return mutateOutbox(userId, (items) => {
     if (items.some((i) => i.client_uuid === item.client_uuid)) return null;
-    return [...items, { ...item, status: 'pending', created_at: new Date().toISOString() }];
+    const held = opts.holdMs ? { hold_until: new Date(now.getTime() + opts.holdMs).toISOString() } : {};
+    return [...items, { ...item, ...held, status: 'pending', created_at: now.toISOString() }];
+  });
+}
+
+/** Item ainda dentro da espera do desfazer. Prazo vencido (ex.: app reaberto) não segura mais. */
+export function isHeld(item: OutboxItem, now: Date): boolean {
+  return !!item.hold_until && new Date(item.hold_until).getTime() > now.getTime();
+}
+
+/** Desfaz um item pendente ainda em espera; devolve se removeu (rejeitado ou fora do prazo não sai). */
+export async function undo(userId: string, clientUuid: string, now: Date = new Date()): Promise<boolean> {
+  let removed = false;
+  await mutateOutbox(userId, (items) => {
+    const keep = items.filter(
+      (i) => !(i.client_uuid === clientUuid && i.status === 'pending' && isHeld(i, now)),
+    );
+    removed = keep.length !== items.length;
+    return removed ? keep : null;
+  });
+  return removed;
+}
+
+/** Encerra a espera dos itens indicados (o operador já não pode mais desfazê-los). */
+export function releaseHolds(userId: string, clientUuids: string[]): Promise<void> {
+  const ids = new Set(clientUuids);
+  return mutateOutbox(userId, (items) => {
+    if (!items.some((i) => ids.has(i.client_uuid) && i.hold_until)) return null;
+    return items.map((i) => {
+      if (!ids.has(i.client_uuid)) return i;
+      const { hold_until: _hold, ...rest } = i;
+      return rest;
+    });
   });
 }
 
