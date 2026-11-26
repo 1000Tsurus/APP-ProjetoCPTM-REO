@@ -1,7 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkError, request } from './api/client';
 import type { SyncBatchRead, SyncItemResult } from './api/types';
-import { isHeld, listOutbox, mutateOutbox, type OutboxItem, type OutboxType } from './outbox';
+import { isHeld, listOutbox, mutateOutbox, SYNC_GRACE_MS, type OutboxItem, type OutboxType } from './outbox';
 import { sendRegistrations } from './sync-register';
 import { uuidv4 } from './uuid';
 
@@ -68,7 +68,7 @@ function sendable(items: OutboxItem[], skip: Set<string>): ReplicarItem[] {
       i.status === 'pending' &&
       i.type !== 'register' &&
       i.type !== 'resolve' &&
-      !isHeld(i, now) &&
+      !isHeld(i, now, SYNC_GRACE_MS) &&
       !skip.has(i.client_uuid),
   );
 }
@@ -173,7 +173,11 @@ export async function syncNow(userId: string): Promise<SyncSummary | 'offline' |
       const extra = await runPass(userId, device, sentFirst, summary);
       if (extra === 'offline') return 'offline';
     }
-    await AsyncStorage.setItem(lastKey(userId), new Date().toISOString());
+    // Só marca "última sincronização" se algo chegou ao servidor ou se não sobrou nada pendente;
+    // com tudo em espera do desfazer, nada foi enviado e o horário seria enganoso.
+    const reachedServer = registrations.registered + registrations.converted + registrations.rejected > 0 || summary.sent > 0;
+    const nothingPending = !(await listOutbox(userId)).some((i) => i.status === 'pending');
+    if (reachedServer || nothingPending) await AsyncStorage.setItem(lastKey(userId), new Date().toISOString());
     return summary;
   } finally {
     running = false;

@@ -4,7 +4,7 @@ import type { ResolvePayload, SleeperCreate, SleeperRead } from './api/types';
 import { getLocations } from './catalog-cache';
 import { buildMovement } from './forms';
 import { addIncomplete } from './incomplete';
-import { isHeld, listOutbox, mutateOutbox, type OutboxItem } from './outbox';
+import { isHeld, listOutbox, mutateOutbox, SYNC_GRACE_MS, type OutboxItem } from './outbox';
 
 export type RegistrationSummary = { registered: number; converted: number; rejected: number };
 
@@ -13,7 +13,7 @@ type Target = { tag: string; locationId: string; locationName?: string; occurred
 
 /** Antes de cadastrar o dormente, o item precisa ser do tipo certo e já ter saído da espera. */
 const isRegistrationWork = (item: OutboxItem, now: Date): boolean =>
-  item.status === 'pending' && (item.type === 'register' || item.type === 'resolve') && !isHeld(item, now);
+  item.status === 'pending' && (item.type === 'register' || item.type === 'resolve') && !isHeld(item, now, SYNC_GRACE_MS);
 
 function targetOf(item: OutboxItem): Target {
   if (item.type === 'register') {

@@ -241,3 +241,23 @@ test('erro 500 no cadastro mantém o item pendente', async () => {
   assert.equal(m.status, 'pending');
   assert.equal(m.type, 'register');
 });
+
+test('sync não envia item dentro de hold_until + 1000 ms', async () => {
+  const { outbox, sync, calls } = setup(acceptAll);
+  // hold_until venceu há 500 ms: ainda dentro da margem de 1 s.
+  await outbox.enqueue('u1', movementItem(), { holdMs: 5000, now: new Date(Date.now() - 5500) });
+  const r = await sync.syncNow('u1');
+  assert.equal(calls.length, 0);
+  assert.equal(r.sent, 0);
+  // Vencido há 2 s: passa da margem e vai.
+  const b = setup(acceptAll);
+  await b.outbox.enqueue('u1', movementItem(), { holdMs: 5000, now: new Date(Date.now() - 7000) });
+  assert.equal((await b.sync.syncNow('u1')).sent, 1);
+});
+
+test('lastSyncAt não grava quando tudo está em espera', async () => {
+  const { outbox, sync } = setup(acceptAll);
+  await outbox.enqueue('u1', movementItem(), { holdMs: 60000, now: new Date() });
+  await sync.syncNow('u1');
+  assert.equal(await sync.lastSyncAt('u1'), null);
+});

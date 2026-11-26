@@ -9,6 +9,12 @@ import { isValidTag, normalizeTag } from './tag';
 /** Tempo que o operador tem para desfazer uma leitura antes de ela poder ser enviada. */
 export const HOLD_MS = 5000;
 
+/** Texto da resposta a uma tag já lida no lote. */
+export const DUPLICATE_MESSAGE = 'Já lido neste lote.';
+
+/** O botão Desfazer some um pouco antes do prazo real, para não oferecer um desfazer que já não vale. */
+export const UNDO_MARGIN_MS = 500;
+
 export type BatchRead = {
   tag: string;
   /** Só existe quando a leitura virou item da fila. */
@@ -17,6 +23,8 @@ export type BatchRead = {
   message: string;
   at: string;
   undone: boolean;
+  /** Fim da espera do desfazer (mesmo instante gravado em `hold_until`); null se não virou item da fila. */
+  holdUntil: string | null;
 };
 
 export type BatchSession = {
@@ -34,6 +42,7 @@ export type BatchSessionDeps = {
   enqueue: typeof enqueue;
   undo: typeof undo;
   releaseHolds: typeof releaseHolds;
+  /** Pode resolver antes de o envio terminar: a interface o dispara em segundo plano. */
   sync: () => Promise<unknown>;
   uuid: () => string;
   now: () => Date;
@@ -62,8 +71,14 @@ export function createBatchSession(deps: BatchSessionDeps): BatchSession {
     }
   };
 
-  const push = (tag: string, tone: ReadTone, message: string, clientUuid: string | null): BatchRead => {
-    const entry: BatchRead = { tag, clientUuid, tone, message, at: deps.now().toISOString(), undone: false };
+  const push = (
+    tag: string,
+    tone: ReadTone,
+    message: string,
+    clientUuid: string | null,
+    holdUntil: string | null = null,
+  ): BatchRead => {
+    const entry: BatchRead = { tag, clientUuid, tone, message, at: deps.now().toISOString(), undone: false, holdUntil };
     list.push(entry);
     notify();
     return entry;
@@ -74,18 +89,20 @@ export function createBatchSession(deps: BatchSessionDeps): BatchSession {
     try {
       const lookup = await deps.lookup(tag);
       const clientUuid = deps.uuid();
-      const decision = decideRead(deps.task, tag, lookup, { clientUuid, now: deps.now() });
+      // Um só instante para o prazo gravado na fila e o do botão Desfazer.
+      const stamp = deps.now();
+      const decision = decideRead(deps.task, tag, lookup, { clientUuid, now: stamp });
       if (decision.outcome !== 'record') {
         taken.delete(tag);
         return push(tag, decision.tone, decision.message, null);
       }
-      await deps.enqueue(deps.userId, decision.item, { holdMs, now: deps.now() });
+      await deps.enqueue(deps.userId, decision.item, { holdMs, now: stamp });
       const cancel = deps.schedule(() => {
         cancels.delete(cancel);
         deps.sync().catch(() => undefined);
       }, holdMs + 100);
       cancels.add(cancel);
-      return push(tag, decision.tone, decision.message, clientUuid);
+      return push(tag, decision.tone, decision.message, clientUuid, new Date(stamp.getTime() + holdMs).toISOString());
     } catch {
       taken.delete(tag);
       return push(tag, 'error', 'Erro ao consultar a tag.', null);
@@ -104,9 +121,10 @@ export function createBatchSession(deps: BatchSessionDeps): BatchSession {
           tag,
           clientUuid: null,
           tone: 'warn',
-          message: 'Já lido neste lote.',
+          message: DUPLICATE_MESSAGE,
           at: deps.now().toISOString(),
           undone: false,
+          holdUntil: null,
         });
       } else {
         // Reserva já na chegada, para uma segunda leitura durante a consulta ser ignorada.
@@ -152,11 +170,13 @@ export function createBatchSession(deps: BatchSessionDeps): BatchSession {
 
 /**
  * Totais do lote para a tela: `read` = leituras registradas e não desfeitas; dessas, `sent` já saiu
- * da fila, `rejected` está na fila rejeitada e `queued` é o resto (pendente).
+ * da fila, `rejected` está na fila rejeitada (ou foi visto rejeitado e descartado, `everRejected`) e
+ * `queued` é o resto (pendente).
  */
 export function batchCounts(
   reads: BatchRead[],
   outbox: OutboxItem[],
+  everRejected: ReadonlySet<string> = new Set(),
 ): { read: number; sent: number; queued: number; rejected: number } {
   const status = new Map(outbox.map((i) => [i.client_uuid, i.status]));
   const counts = { read: 0, sent: 0, queued: 0, rejected: 0 };
@@ -164,9 +184,21 @@ export function batchCounts(
     if (!r.clientUuid || r.undone) continue;
     counts.read += 1;
     const s = status.get(r.clientUuid);
-    if (s === undefined) counts.sent += 1;
+    // Sumiu da fila: foi enviado, a não ser que tenha sido visto rejeitado (descartado depois).
+    if (s === undefined) counts[everRejected.has(r.clientUuid) ? 'rejected' : 'sent'] += 1;
     else if (s === 'rejected') counts.rejected += 1;
     else counts.queued += 1;
   }
   return counts;
+}
+
+/** Milissegundos que o botão Desfazer ainda fica aberto (0 = fechado). */
+export function undoButtonMs(card: Pick<BatchRead, 'holdUntil'>, nowMs: number): number {
+  if (!card.holdUntil) return 0;
+  return Math.max(0, Date.parse(card.holdUntil) - UNDO_MARGIN_MS - nowMs);
+}
+
+/** Repetição da tag que já está no cartão: o cartão (e o Desfazer) continua, só aparece o aviso. */
+export function keepsCurrentCard(current: BatchRead | null, result: BatchRead): boolean {
+  return !!current && result.clientUuid === null && result.message === DUPLICATE_MESSAGE && result.tag === current.tag;
 }

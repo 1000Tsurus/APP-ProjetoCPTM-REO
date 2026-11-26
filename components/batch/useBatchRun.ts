@@ -3,7 +3,14 @@ import { Vibration } from 'react-native';
 
 import { useReader } from '@/contexts/ReaderContext';
 import type { BatchTask, ReadTone } from '@/data/batch';
-import { batchCounts, createBatchSession, HOLD_MS, type BatchRead, type BatchSession } from '@/data/batch-session';
+import {
+  batchCounts,
+  createBatchSession,
+  keepsCurrentCard,
+  undoButtonMs,
+  type BatchRead,
+  type BatchSession,
+} from '@/data/batch-session';
 import { lookupSleeper } from '@/data/catalog-cache';
 import { enqueue, listOutbox, releaseHolds, subscribeOutbox, undo } from '@/data/outbox';
 import { syncNow } from '@/data/sync';
@@ -32,6 +39,10 @@ export function useBatchRun(task: BatchTask, userId: string) {
   const sessionRef = useRef<BatchSession | null>(null);
   const stopRef = useRef<(() => void) | null>(null);
   const finished = useRef(false);
+  // Cartão atual sem depender do render, para decidir se uma repetição o substitui.
+  const cardRef = useRef<BatchRead | null>(null);
+  // Itens vistos rejeitados na fila: se forem descartados depois, continuam contando como rejeitados.
+  const rejectedSeen = useRef<Set<string>>(new Set());
 
   const handleTag = useCallback((tag: string) => {
     const session = sessionRef.current;
@@ -40,7 +51,13 @@ export function useBatchRun(task: BatchTask, userId: string) {
       .read(tag)
       .then((r) => {
         vibrate(r.tone);
+        if (keepsCurrentCard(cardRef.current, r)) {
+          // Repetição da tag do cartão: mantém o cartão e o Desfazer, só avisa.
+          setUndoNote(r.message);
+          return;
+        }
         setUndoNote(null);
+        cardRef.current = r;
         setCard(r);
       })
       .catch(() => undefined);
@@ -80,12 +97,15 @@ export function useBatchRun(task: BatchTask, userId: string) {
     });
     sessionRef.current = session;
     finished.current = false;
+    cardRef.current = null;
+    rejectedSeen.current = new Set();
     let alive = true;
     const refresh = () => {
       setReads(session.reads());
       listOutbox(userId)
         .then((items) => {
-          if (alive) setCounts(batchCounts(session.reads(), items));
+          for (const i of items) if (i.status === 'rejected') rejectedSeen.current.add(i.client_uuid);
+          if (alive) setCounts(batchCounts(session.reads(), items, rejectedSeen.current));
         })
         .catch(() => undefined);
     };
@@ -103,13 +123,13 @@ export function useBatchRun(task: BatchTask, userId: string) {
     };
   }, [task, userId, reader, handleTag, finish]);
 
-  // "Desfazer" fica aberto por 5 s a contar da leitura.
+  // "Desfazer" fica aberto até 500 ms antes do fim da espera gravada na fila (`holdUntil`).
   useEffect(() => {
     if (!card?.clientUuid || card.undone || card.tone === 'error' || card.tone === 'warn') {
       setUndoOpen(false);
       return;
     }
-    const left = HOLD_MS - (Date.now() - Date.parse(card.at));
+    const left = undoButtonMs(card, Date.now());
     if (left <= 0) {
       setUndoOpen(false);
       return;
@@ -124,10 +144,12 @@ export function useBatchRun(task: BatchTask, userId: string) {
     if (!session || !card?.clientUuid) return;
     const ok = await session.undo(card.clientUuid).catch(() => false);
     if (ok) {
-      setCard({ ...card, undone: true });
+      const next = { ...card, undone: true };
+      cardRef.current = next;
+      setCard(next);
       setUndoNote(null);
     } else {
-      setUndoNote('Já enviado, não dá para desfazer.');
+      setUndoNote('Prazo para desfazer acabou — a leitura segue na fila.');
     }
   }, [card]);
 

@@ -125,9 +125,15 @@ export function enqueue(
   });
 }
 
-/** Item ainda dentro da espera do desfazer. Prazo vencido (ex.: app reaberto) não segura mais. */
-export function isHeld(item: OutboxItem, now: Date): boolean {
-  return !!item.hold_until && new Date(item.hold_until).getTime() > now.getTime();
+/** Margem extra que o envio respeita depois do `hold_until`, para um desfazer tardio não perder para o sync. */
+export const SYNC_GRACE_MS = 1000;
+
+/**
+ * Item ainda dentro da espera do desfazer. Prazo vencido (ex.: app reaberto) não segura mais.
+ * `graceMs` estende a espera; o `undo` usa o prazo exato (0), o envio usa `SYNC_GRACE_MS`.
+ */
+export function isHeld(item: OutboxItem, now: Date, graceMs = 0): boolean {
+  return !!item.hold_until && new Date(item.hold_until).getTime() + graceMs > now.getTime();
 }
 
 /** Desfaz um item pendente ainda em espera; devolve se removeu (rejeitado ou fora do prazo não sai). */

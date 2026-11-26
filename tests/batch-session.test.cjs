@@ -162,3 +162,42 @@ test('batchCounts: enviada, na fila, rejeitada e desfeita', () => {
   const outbox = [{ client_uuid: 'queued', status: 'pending' }, { client_uuid: 'rej', status: 'rejected' }];
   assert.deepEqual(json(session.batchCounts(reads, outbox)), { read: 3, sent: 1, queued: 1, rejected: 1 });
 });
+
+test('batchCounts: item rejeitado que sumiu da fila (descartado) conta como rejeitado, não enviado', () => {
+  const mk = (id) => ({ tag: id, clientUuid: id, tone: 'ok', message: '', at: '', undone: false });
+  const reads = [mk('sent'), mk('gone')];
+  const counts = session.batchCounts(reads, [], new Set(['gone']));
+  assert.deepEqual(json(counts), { read: 2, sent: 1, queued: 0, rejected: 1 });
+});
+
+test('holdUntil da leitura é o instante passado ao enqueue mais holdMs', async () => {
+  let t = Date.parse('2026-11-26T12:00:00.000Z');
+  const { s, calls } = setup({ now: () => new Date((t += 300)) });
+  const r = await s.read('AAA');
+  const enqueuedAt = calls.enqueue[0].opts.now.getTime();
+  assert.equal(r.holdUntil, new Date(enqueuedAt + 5000).toISOString());
+  assert.equal(calls.enqueue[0].opts.holdMs, 5000);
+});
+
+test('leitura sem registro não tem holdUntil', async () => {
+  const { s } = setup();
+  const bad = await s.read('A B');
+  assert.equal(bad.holdUntil, null);
+});
+
+test('undoButtonMs fecha 500 ms antes do holdUntil', () => {
+  const now = Date.parse('2026-11-26T12:00:01.000Z');
+  const card = { clientUuid: 'a', holdUntil: '2026-11-26T12:00:05.000Z' };
+  assert.equal(session.undoButtonMs(card, now), 3500);
+  assert.equal(session.undoButtonMs({ ...card, holdUntil: null }, now), 0);
+  assert.equal(session.undoButtonMs(card, Date.parse('2026-11-26T12:00:04.600Z')), 0);
+});
+
+test('leitura repetida da tag que está no cartão mantém o cartão (e o Desfazer)', () => {
+  const cur = { tag: 'AAA', clientUuid: 'u1', tone: 'ok', message: '', at: '', undone: false, holdUntil: null };
+  const dup = { tag: 'AAA', clientUuid: null, tone: 'warn', message: 'Já lido neste lote.', at: '', undone: false, holdUntil: null };
+  assert.equal(session.keepsCurrentCard(cur, dup), true);
+  assert.equal(session.keepsCurrentCard(cur, { ...dup, tag: 'BBB' }), false);
+  assert.equal(session.keepsCurrentCard(null, dup), false);
+  assert.equal(session.keepsCurrentCard(cur, { ...dup, message: 'Já está em X.' }), false);
+});
