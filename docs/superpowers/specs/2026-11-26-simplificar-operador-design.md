@@ -118,13 +118,14 @@ Movimentar um dormente só é um lote de um. A ocorrência avulsa a partir da fi
 
 ### Como cada leitura vira registro
 
-O app decide o tipo pela tarefa e pelo que sabe do dormente (cache ou API):
+O app decide o tipo pela tarefa e pelo que sabe do dormente (cache ou API). Aviso amarelo e bloqueio
+vermelho só acontecem com dado fresco da API; com dado do cache o app registra e a API decide.
 
 | Tarefa | Dormente conhecido | Tag desconhecida |
 |---|---|---|
 | Receber / Transferir para L | fora do pátio → entrada em L; no pátio em outro local → transferência para L; já em L → aviso amarelo, nada registrado | cadastro em L (entrada gerada pela API) |
 | Retirar com RM | retirada | vermelho "tag não cadastrada", nada registrado |
-| Ocorrência | ocorrência com tipo + frase | ocorrência pela tag (a API rejeita se não existir; aparece na Fila) |
+| Ocorrência | ocorrência com tipo + frase | vermelho "tag não cadastrada", nada registrado (offline e fora do cache: entra na fila e a API decide) |
 
 Receber e Transferir ficam com a mesma regra; os dois botões existem porque é a linguagem do operador,
 e o rótulo do lote muda.
@@ -152,8 +153,7 @@ Concluir o lote ou sair da tela libera as esperas na hora.
 Campo único no lote (e em Consultar):
 - ≥4 caracteres → sugestões: online por `GET /dormentes?q=`; offline pelos dormentes do cache.
   Toque na sugestão = mesma coisa que uma leitura.
-- Texto que parece tag completa + Enter → tratado como leitura (cobre tag nova e o leitor em modo
-  teclado).
+- Enter → o texto é tratado como leitura da tag completa (cobre tag nova e o leitor em modo teclado).
 - Teclado em maiúsculas, sem autocorreção. O campo volta a ficar focado depois de cada registro.
 
 ### Cadastros incompletos
