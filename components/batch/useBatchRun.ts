@@ -66,7 +66,11 @@ export function useBatchRun(task: BatchTask, userId: string) {
       enqueue,
       undo,
       releaseHolds,
-      sync: () => syncNow(userId),
+      // Envio em segundo plano: "Concluir" não espera a rede, só a liberação das leituras.
+      sync: () => {
+        syncNow(userId).catch(() => undefined);
+        return Promise.resolve();
+      },
       uuid: uuidv4,
       now: () => new Date(),
       schedule: (fn, ms) => {

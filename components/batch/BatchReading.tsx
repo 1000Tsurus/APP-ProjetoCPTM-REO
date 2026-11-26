@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { StatusStrip } from '@/components/StatusStrip';
@@ -5,6 +6,7 @@ import { Button, EmptyState } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useReader } from '@/contexts/ReaderContext';
 import type { BatchTask } from '@/data/batch';
+import { isValidTag, normalizeTag } from '@/data/tag';
 import { BatchFooter } from './BatchFooter';
 import { READ_TONE, ReadCard } from './ReadCard';
 import { TagSearchField } from './TagSearchField';
@@ -18,7 +20,10 @@ export function BatchReading({ task, userId, onDone }: Props) {
   const reader = useReader();
   const run = useBatchRun(task, userId);
   // Com o leitor por teclado, o campo de texto passa pelo leitor: um só caminho para as duas rotas.
-  const submitTag = (tag: string) => (reader.push ? reader.push(tag) : run.handleTag(tag));
+  // Tag inválida o leitor descarta em silêncio; vai direto à sessão para mostrar o cartão de erro.
+  const submitTag = (tag: string) =>
+    reader.push && isValidTag(normalizeTag(tag)) ? reader.push(tag) : run.handleTag(tag);
+  const done = useRef(false);
   const listed = [...run.reads].reverse();
 
   return (
@@ -33,6 +38,8 @@ export function BatchReading({ task, userId, onDone }: Props) {
           icon="checkmark"
           small
           onPress={() => {
+            if (done.current) return;
+            done.current = true;
             void run.finish().then(onDone);
           }}
         />
@@ -50,7 +57,7 @@ export function BatchReading({ task, userId, onDone }: Props) {
         contentContainerStyle={styles.list}
         keyboardShouldPersistTaps="handled"
         data={listed}
-        keyExtractor={(r, i) => `${r.at}-${r.tag}-${i}`}
+        keyExtractor={(r) => `${r.at}-${r.tag}`}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <Text style={[styles.rowTag, { fontFamily: FONT_CODE }, item.undone ? styles.undone : null]} numberOfLines={1}>

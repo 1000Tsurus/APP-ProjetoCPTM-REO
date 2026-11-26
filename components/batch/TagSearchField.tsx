@@ -16,6 +16,11 @@ export function TagSearchField({ onRead }: Props) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<SleeperRead[]>([]);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const focusTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => () => {
+    if (focusTimer.current) clearTimeout(focusTimer.current);
+  }, []);
 
   useEffect(() => {
     const q = text.trim();
@@ -46,7 +51,7 @@ export function TagSearchField({ onRead }: Props) {
     setText('');
     setItems([]);
     // Devolve o foco: o operador segue lendo/digitando sem tocar no campo.
-    setTimeout(() => inputRef.current?.focus(), 0);
+    focusTimer.current = setTimeout(() => inputRef.current?.focus(), 0);
   }
 
   return (
@@ -58,7 +63,7 @@ export function TagSearchField({ onRead }: Props) {
         value={text}
         onChangeText={setText}
         onSubmitEditing={() => submit(text)}
-        blurOnSubmit={false}
+        submitBehavior="submit"
         autoCapitalize="characters"
         autoCorrect={false}
         returnKeyType="done"
