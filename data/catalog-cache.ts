@@ -86,3 +86,16 @@ export async function lookupSleeper(tag: string): Promise<LookupResult> {
     return { sleeper: saved.sleeper, fetchedAt: saved.fetchedAt, fromCache: true };
   }
 }
+
+/** Busca offline: contém (sem caixa) na tag ou na ata, na ordem do cache, até `limit`. */
+export async function searchCachedSleepers(q: string, limit = 10): Promise<SleeperRead[]> {
+  const term = q.trim().toLowerCase();
+  const all = (await readJson<SleeperEntry[]>(SLEEPERS_KEY)) ?? [];
+  const found: SleeperRead[] = [];
+  for (const { sleeper } of all) {
+    const hay = [sleeper.rfid_tag, sleeper.registration_record ?? ''];
+    if (hay.some((h) => h.toLowerCase().includes(term))) found.push(sleeper);
+    if (found.length >= limit) break;
+  }
+  return found;
+}
