@@ -1,12 +1,13 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
-const { load } = require('./helpers/load.cjs');
+const { load, memory } = require('./helpers/load.cjs');
 
 const tagMod = load('data/tag.ts', {});
 const labels = load('data/labels.ts', {});
 const forms = load('data/forms.ts', { './tag': tagMod, './labels': labels });
 const batch = load('data/batch.ts', { './forms': forms, './tag': tagMod });
-const session = load('data/batch-session.ts', { './batch': batch, './tag': tagMod });
+const outboxMod = load('data/outbox.ts', { '@react-native-async-storage/async-storage': memory() });
+const session = load('data/batch-session.ts', { './batch': batch, './tag': tagMod, './outbox': outboxMod });
 
 const A = '5a1d2c3b-4e5f-4a6b-8c7d-9e0f1a2b3c4d';
 const task = { kind: 'receive', locationId: A, locationName: 'Pátio A' };
@@ -75,7 +76,8 @@ test('record enfileira com espera de 5 s e agenda o sync', async () => {
   const { s, calls } = setup();
   const r = await s.read('AAA');
   assert.equal(calls.enqueue[0].opts.holdMs, 5000);
-  assert.equal(calls.schedule[0].ms, 5100);
+  assert.equal(calls.schedule[0].ms, session.HOLD_MS + outboxMod.SYNC_GRACE_MS + 100);
+  assert.equal(calls.schedule[0].ms, 6100);
   assert.equal(r.clientUuid, calls.enqueue[0].item.client_uuid);
   await calls.schedule[0].fn();
   assert.equal(calls.sync, 1);

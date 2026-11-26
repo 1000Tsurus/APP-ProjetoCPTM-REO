@@ -3,7 +3,7 @@
 // Módulo puro com dependências injetadas, sem React; a tela só assina as mudanças.
 import { decideRead, type BatchTask, type ReadTone } from './batch';
 import type { LookupResult } from './catalog-cache';
-import type { OutboxItem, enqueue, releaseHolds, undo } from './outbox';
+import { SYNC_GRACE_MS, type OutboxItem, type enqueue, type releaseHolds, type undo } from './outbox';
 import { isValidTag, normalizeTag } from './tag';
 
 /** Tempo que o operador tem para desfazer uma leitura antes de ela poder ser enviada. */
@@ -100,7 +100,7 @@ export function createBatchSession(deps: BatchSessionDeps): BatchSession {
       const cancel = deps.schedule(() => {
         cancels.delete(cancel);
         deps.sync().catch(() => undefined);
-      }, holdMs + 100);
+      }, holdMs + SYNC_GRACE_MS + 100); // depois da margem que o envio respeita
       cancels.add(cancel);
       return push(tag, decision.tone, decision.message, clientUuid, new Date(stamp.getTime() + holdMs).toISOString());
     } catch {
