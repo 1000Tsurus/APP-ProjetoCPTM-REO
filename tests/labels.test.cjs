@@ -16,3 +16,12 @@ test('rótulos e tons dos enums seguem o site', () => {
 test('valor desconhecido volta cru', () => {
   assert.equal(labels.label(labels.MOVEMENT_KIND, 'xyz'), 'xyz');
 });
+
+test('espécie mostra o nome, não o código', () => {
+  const base = { id: 'x', code: '01', scientific_name: null, common_name: null };
+  assert.equal(labels.speciesLabel({ ...base, scientific_name: 'Apuleia leiocarpa' }), 'Apuleia leiocarpa');
+  assert.equal(labels.speciesLabel({ ...base, scientific_name: 'Apuleia leiocarpa', common_name: 'Garapa' }), 'Garapa');
+  assert.equal(labels.speciesLabel(base), '01');
+  assert.equal(labels.speciesLabel(null), '');
+  assert.equal(labels.speciesLabel(undefined), '');
+});

@@ -8,7 +8,7 @@ import { COLOR, FONT_CODE, FONT_SIZE, MIN_TOUCH, RADIUS, SPACE, type Tone } from
 import { errorMessage, NetworkError } from '@/data/api/client';
 import { listSleepers } from '@/data/api/endpoints';
 import type { SleeperRead, SleeperStatus } from '@/data/api/types';
-import { SLEEPER_STATUS } from '@/data/labels';
+import { SLEEPER_STATUS, speciesLabel } from '@/data/labels';
 
 const PAGE_SIZE = 50;
 const STATUSES = Object.keys(SLEEPER_STATUS) as SleeperStatus[];
@@ -121,7 +121,7 @@ export default function SleepersScreen() {
             <View style={styles.rowText}>
               <Text style={styles.tag}>{item.rfid_tag}</Text>
               <Text style={styles.sub}>
-                {[item.species?.common_name ?? item.species?.code, item.current_location?.name]
+                {[speciesLabel(item.species) || undefined, item.current_location?.name]
                   .filter(Boolean)
                   .join(' · ') || 'Sem espécie/local'}
               </Text>

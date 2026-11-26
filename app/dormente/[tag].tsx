@@ -12,7 +12,7 @@ import { getSleeperHistory } from '@/data/api/endpoints';
 import type { HistoryEntry, SleeperRead } from '@/data/api/types';
 import { canFieldWork, canInspect } from '@/data/auth-store';
 import { lookupSleeper, type LookupResult } from '@/data/catalog-cache';
-import { label, SLEEPER_STATUS } from '@/data/labels';
+import { label, SLEEPER_STATUS, speciesLabel } from '@/data/labels';
 import { listOutbox, subscribeOutbox, type OutboxItem } from '@/data/outbox';
 import { isValidTag, normalizeTag } from '@/data/tag';
 
@@ -183,7 +183,7 @@ export default function SleeperScreen() {
               <Info name="Ata" value={dash(found.sleeper.registration_record)} mono />
               <Info
                 name="Espécie"
-                value={dash(found.sleeper.species?.common_name ?? found.sleeper.species?.code)}
+                value={dash(speciesLabel(found.sleeper.species) || null)}
               />
               <Info name="Classe" value={dash(found.sleeper.wood_class)} />
               <Info name="Comprimento" value={formatLength(found.sleeper.length_m)} />

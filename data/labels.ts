@@ -10,6 +10,7 @@ import type {
   OccurrenceKind,
   Role,
   SleeperStatus,
+  SpeciesSummary,
 } from './api/types';
 
 export type ToneLabel = { label: string; tone: Tone };
@@ -66,4 +67,13 @@ export function label(map: Record<string, string | ToneLabel>, value: string | n
   const item = map[value];
   if (item === undefined) return value;
   return typeof item === 'string' ? item : item.label;
+}
+
+/**
+ * Nome da espécie para exibição: nome popular, senão o científico, senão o código.
+ * O catálogo do seed só tem nome científico, então mostrar só o código ("01") não dizia nada.
+ */
+export function speciesLabel(s: Pick<SpeciesSummary, 'code' | 'scientific_name' | 'common_name'> | null | undefined): string {
+  if (!s) return '';
+  return s.common_name ?? s.scientific_name ?? s.code;
 }

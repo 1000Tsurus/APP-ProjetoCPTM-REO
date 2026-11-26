@@ -10,7 +10,7 @@ import type { ConservationState, InspectionResult, MoistureLevel, SpeciesRead } 
 import { canInspect } from '@/data/auth-store';
 import { getSpecies } from '@/data/catalog-cache';
 import { buildInspection } from '@/data/forms';
-import { CONSERVATION, INSPECTION_RESULT, MOISTURE } from '@/data/labels';
+import { CONSERVATION, INSPECTION_RESULT, MOISTURE, speciesLabel } from '@/data/labels';
 import { finishAndLeave, saveToQueue } from '@/data/save-record';
 import { normalizeTag } from '@/data/tag';
 import { uuidv4 } from '@/data/uuid';
@@ -31,7 +31,6 @@ const SPECIES_OPTIONS = [
   { id: 'no' as const, label: 'Corrigir' },
 ];
 
-const speciesLabel = (s: SpeciesRead) => s.common_name ?? s.scientific_name ?? s.code;
 
 /** Checklist de inspeção (técnico, especialista, admin) gravado na fila; mede o tempo desde a abertura. */
 export default function InspectScreen() {

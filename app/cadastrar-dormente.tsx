@@ -9,6 +9,7 @@ import { useSession } from '@/contexts/SessionContext';
 import { ApiError, errorMessage, NetworkError } from '@/data/api/client';
 import { createSleeper } from '@/data/api/endpoints';
 import type { LocationRead, SleeperCreate, SpeciesRead } from '@/data/api/types';
+import { speciesLabel } from '@/data/labels';
 import { canFieldWork } from '@/data/auth-store';
 import { getLocations, getSpecies } from '@/data/catalog-cache';
 import { fieldFromErrors, parseLength, parseYear, type SleeperFormField } from '@/data/sleeper-form';
@@ -17,7 +18,6 @@ import { uuidv4 } from '@/data/uuid';
 
 type Errors = Partial<Record<SleeperFormField, string>>;
 
-const speciesLabel = (s: SpeciesRead) => s.common_name ?? s.scientific_name ?? s.code;
 const orNull = (v: string) => (v.trim() === '' ? null : v.trim());
 
 /** Cadastro de dormente (online): tag pré-preenchida, espécie/local dos catálogos e validação antes de enviar. */
