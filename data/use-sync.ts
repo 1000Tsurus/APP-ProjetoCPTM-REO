@@ -66,8 +66,8 @@ export function useSync(): {
     } finally {
       inFlight.current -= 1;
       if (mounted.current) setSyncing(inFlight.current > 0);
-      await refreshCounts();
-      await refreshLastOk();
+      await refreshCounts().catch(() => undefined);
+      await refreshLastOk().catch(() => undefined);
     }
   }, [userId, refreshCounts, refreshLastOk]);
 
@@ -77,7 +77,7 @@ export function useSync(): {
   }, [userId]);
 
   useEffect(() => {
-    void refreshLastOk();
+    refreshLastOk().catch(() => undefined);
   }, [refreshLastOk]);
 
   useEffect(() => {

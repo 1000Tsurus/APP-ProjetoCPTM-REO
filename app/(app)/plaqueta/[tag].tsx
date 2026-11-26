@@ -97,7 +97,11 @@ export default function PlateScreen() {
     setSaving(true);
     try {
       await updateSleeper(sleeper.id, built.payload);
-      await removeIncomplete(userId, tag);
+      try {
+        await removeIncomplete(userId, tag);
+      } catch {
+        // A plaqueta já foi salva; a pendência local some na próxima conferência.
+      }
       Alert.alert('Plaqueta salva.');
       router.back();
     } catch (e) {

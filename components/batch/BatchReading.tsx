@@ -48,7 +48,7 @@ export function BatchReading({ task, userId, onDone }: Props) {
         ) : (
           <EmptyState text="Aproxime o leitor de uma tag ou digite abaixo." />
         )}
-        <TagSearchField onRead={submitTag} />
+        <TagSearchField onRead={submitTag} autoFocus />
       </View>
       <FlatList
         style={styles.flex}

@@ -24,7 +24,7 @@ A autorização real é da API; o app só esconde botões.
 
 ## Fila offline
 
-- Movimentação, inspeção e ocorrência sempre são gravadas na fila do aparelho primeiro e depois enviadas por `POST /sincronizacao/replicar`. Cadastro de dormente pela leitura em lote também passa pela fila (`register`/`resolve`, abaixo); o formulário de cadastro avulso segue online direto.
+- Movimentação, inspeção e ocorrência sempre são gravadas na fila do aparelho primeiro e depois enviadas por `POST /sincronizacao/replicar`. Cadastro de dormente pela leitura em lote também passa pela fila (`register`/`resolve`, abaixo).
 - Cada item tem um `client_uuid` (UUID v4) gerado uma vez; reenviar o mesmo item não duplica (a API responde `duplicate` e o item sai da fila).
 - Sem rede, o item fica **aguardando envio** e continua na fila mesmo se o app for fechado. A fila é por usuário e sobrevive a logout.
 - Item **rejeitado** pela API (ex.: dormente descartado, tag inexistente) fica na tela Fila com código e motivo, e só pode ser descartado.
@@ -44,7 +44,7 @@ Regra de cada leitura (`data/batch.ts`, função pura): a tag é normalizada, co
 | Situação da tag | Receber / Transferir | Retirar | Ocorrência |
 | --- | --- | --- | --- |
 | Não cadastrada (API respondeu 404) | item `register` (cadastro no local) | bloqueia | bloqueia |
-| Fora do cache e sem rede | item `resolve` (decide no envio) | bloqueia ou registra pendente | registra pendente |
+| Fora do cache e sem rede | item `resolve` (decide no envio) | registra pendente (confere no envio) | registra pendente |
 | Dormente conhecido | movimentação (`entry` se fora do pátio, `transfer` se em outro local); pula se já está no destino; bloqueia se descartado | só em estoque (com dado fresco) | ocorrência |
 
 Dado vindo do cache pode estar velho, então só bloqueia ou pula com dado fresco; sem certeza, o servidor julga no envio. Tag repetida no mesmo lote é ignorada. Cada leitura mostra um cartão com o resultado (tom ok, novo, pendente, aviso ou erro).

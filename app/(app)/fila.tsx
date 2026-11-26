@@ -76,7 +76,11 @@ export default function QueueScreen() {
   let note: string | null = null;
   if (tapped && !syncing) {
     if (lastResult === 'offline') note = 'Sem conexão — tente de novo quando houver rede.';
-    else if (lastResult && lastResult.sent === 0) note = 'Nada para enviar.';
+    else if (lastResult && lastResult.sent === 0 && lastResult.registered === 0 && lastResult.rejected === 0) {
+      note = items.some((i) => i.status === 'pending')
+        ? 'Aguardando o prazo de desfazer.'
+        : 'Nada para enviar.';
+    } else if (lastResult && lastResult.sent === 0) note = `Cadastrados: ${lastResult.registered}, rejeitados: ${lastResult.rejected}.`;
     else if (lastResult) note = `Enviados: ${lastResult.sent} (aceitos ${lastResult.accepted}, rejeitados ${lastResult.rejected}).`;
   }
 
@@ -122,7 +126,7 @@ export default function QueueScreen() {
             <QueueRow key={i.client_uuid} item={i} onDiscard={() => confirmDiscard(i)} />
           ))}
           {rejected.length > 0 ? (
-            <Text style={styles.note}>Para corrigir, registre de novo pela tela do dormente e descarte o rejeitado.</Text>
+            <Text style={styles.note}>Para corrigir, leia a tag de novo em um lote (tela Início) e descarte o rejeitado.</Text>
           ) : null}
         </Panel>
       </ScrollView>

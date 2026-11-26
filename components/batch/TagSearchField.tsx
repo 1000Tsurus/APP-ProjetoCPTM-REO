@@ -9,10 +9,10 @@ import { searchSleepers } from '@/data/manual-search';
 
 const MIN_QUERY = 4;
 
-type Props = { onRead: (tag: string) => void };
+type Props = { onRead: (tag: string) => void; autoFocus?: boolean };
 
 /** Rota manual: busca por tag/ata com sugestões (a partir de 4 caracteres); Enter lê o texto como está. */
-export function TagSearchField({ onRead }: Props) {
+export function TagSearchField({ onRead, autoFocus }: Props) {
   const [text, setText] = useState('');
   const [items, setItems] = useState<SleeperRead[]>([]);
   const inputRef = useRef<ComponentRef<typeof TextInput>>(null);
@@ -67,6 +67,7 @@ export function TagSearchField({ onRead }: Props) {
         autoCapitalize="characters"
         autoCorrect={false}
         returnKeyType="done"
+        autoFocus={autoFocus}
       />
       {items.map((s) => (
         <Pressable key={s.id} accessibilityRole="button" onPress={() => submit(s.rfid_tag)} style={styles.suggestion}>
