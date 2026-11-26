@@ -3,6 +3,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
 import { HistoryList } from '@/components/sleeper/HistoryList';
 import { Badge, Banner, Button, EmptyState, Label, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
@@ -34,10 +36,10 @@ function Info({ name, value, mono }: { name: string; value: string; mono?: boole
   );
 }
 
-/** Dormente pela tag: dados (ou cache), fila pendente, histórico (só online) e ações conforme o papel. */
+/** Ficha do dormente pela tag: ações no topo conforme o papel, dados (ou cache), fila pendente e histórico (só online). */
 export default function SleeperScreen() {
   const router = useRouter();
-  const { user, offline } = useSession();
+  const { user } = useSession();
   const params = useLocalSearchParams<{ tag: string }>();
   // O parâmetro já vem decodificado pelo expo-router; só normalizamos.
   const tag = normalizeTag(Array.isArray(params.tag) ? params.tag[0] : (params.tag ?? ''));
@@ -118,10 +120,26 @@ export default function SleeperScreen() {
   const showActions = !!role && !discarded && !!result && !('notFound' in result);
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />
         <Text style={[styles.tag, { fontFamily: FONT_CODE }]}>{tag}</Text>
+
+        {showActions ? (
+          <View style={styles.actions}>
+            {role && canFieldWork(role) && found ? (
+              <Button title="Completar plaqueta" icon="pricetag-outline" onPress={() => go('plaqueta')} />
+            ) : null}
+            {role && canFieldWork(role) ? (
+              <Button title="Registrar ocorrência" icon="warning-outline" variant="ghost" onPress={() => go('ocorrencia')} />
+            ) : null}
+            {role && canInspect(role) ? (
+              <Button title="Inspecionar" icon="clipboard-outline" variant="ghost" onPress={() => go('inspecionar')} />
+            ) : null}
+          </View>
+        ) : null}
+        {discarded ? <Text style={styles.note}>Dormente descartado: nenhuma ação disponível.</Text> : null}
+
 
         {error ? <Banner tone="warn" text={error} action={{ title: 'Tentar de novo', onPress: () => void load() }} /> : null}
         {!result && !error ? <ActivityIndicator color={COLOR.red} /> : null}
@@ -150,15 +168,7 @@ export default function SleeperScreen() {
             <SectionTitle icon="help-circle-outline" title="Tag não cadastrada" />
             <Text style={styles.text}>Nenhum dormente usa esta tag.</Text>
             {role && canFieldWork(role) ? (
-              <>
-                <Button
-                  title="Cadastrar dormente"
-                  icon="add-circle-outline"
-                  disabled={offline}
-                  onPress={() => router.push(`/cadastrar-dormente?tag=${encoded}` as Href)}
-                />
-                {offline ? <Text style={styles.note}>O cadastro exige conexão.</Text> : null}
-              </>
+              <Text style={styles.note}>Para cadastrar, leia a tag em Receber ou Transferir.</Text>
             ) : null}
           </Panel>
         ) : null}
@@ -205,20 +215,6 @@ export default function SleeperScreen() {
           </>
         ) : null}
 
-        {showActions ? (
-          <View style={styles.actions}>
-            {role && canFieldWork(role) ? (
-              <Button title="Movimentar" icon="swap-horizontal-outline" onPress={() => go('movimentar')} />
-            ) : null}
-            {role && canInspect(role) ? (
-              <Button title="Inspecionar" icon="clipboard-outline" onPress={() => go('inspecionar')} />
-            ) : null}
-            {role && canFieldWork(role) ? (
-              <Button title="Ocorrência" icon="warning-outline" variant="ghost" onPress={() => go('ocorrencia')} />
-            ) : null}
-          </View>
-        ) : null}
-        {discarded ? <Text style={styles.note}>Dormente descartado: nenhuma ação disponível.</Text> : null}
       </ScrollView>
     </SafeAreaView>
   );

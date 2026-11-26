@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
 import { Banner, Button, ChoiceRow, Field, OptionPicker, Panel } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useSession } from '@/contexts/SessionContext';
@@ -118,7 +120,7 @@ export default function InspectScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />

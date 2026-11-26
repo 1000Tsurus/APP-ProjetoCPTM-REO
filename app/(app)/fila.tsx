@@ -3,6 +3,8 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
 import { Badge, Button, EmptyState, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { errorMessage } from '@/data/api/client';
@@ -93,7 +95,7 @@ export default function QueueScreen() {
   const rejected = items.filter((i) => i.status === 'rejected');
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />
         <Text style={styles.title}>Fila de envio</Text>

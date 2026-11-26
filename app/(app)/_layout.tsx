@@ -7,7 +7,10 @@ import { SwipeStack as Stack, swipeStackOptions } from '@/components/navigation/
 import { COLOR } from '@/constants/theme';
 import { useSession } from '@/contexts/SessionContext';
 
-/** Área logada: sem sessão, volta para o login; com sessão, a faixa de status fica no topo. */
+/**
+ * Área logada (abas e telas empilhadas): sem sessão volta ao login; com sessão, a faixa de status
+ * fica no topo de todas as telas e é ela quem consome o recuo superior da tela.
+ */
 export default function OperationLayout() {
   const { user } = useSession();
   if (!user) return <Redirect href="/login" />;
@@ -17,9 +20,7 @@ export default function OperationLayout() {
         <StatusStrip />
       </SafeAreaView>
       <View style={{ flex: 1 }}>
-        <Stack screenOptions={swipeStackOptions}>
-          <Stack.Screen name="(pages)" />
-        </Stack>
+        <Stack screenOptions={swipeStackOptions} />
       </View>
     </View>
   );

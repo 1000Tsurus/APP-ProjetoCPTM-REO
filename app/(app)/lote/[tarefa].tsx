@@ -3,6 +3,8 @@ import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
 import { BatchPrepare } from '@/components/batch/BatchPrepare';
 import { BatchReading } from '@/components/batch/BatchReading';
 import { Button } from '@/components/ui';
@@ -42,7 +44,7 @@ export default function BatchScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       {task && user ? (
         <BatchReading task={task} userId={user.id} onDone={leave} />
       ) : (

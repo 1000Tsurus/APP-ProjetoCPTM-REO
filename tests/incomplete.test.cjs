@@ -34,3 +34,14 @@ test('valor corrompido vira lista vazia', async () => {
   storage.values.set('reo.incomplete.u1', '{ruim');
   assert.deepEqual(plain(await incomplete.listIncomplete('u1')), []);
 });
+
+test('add e remove concorrentes em tags diferentes mantêm a lista certa', async () => {
+  const { incomplete } = setup();
+  await incomplete.addIncomplete('u1', { tag: 'AAA', sleeper_id: 's1', created_at: 'x' });
+  await Promise.all([
+    incomplete.addIncomplete('u1', { tag: 'BBB', sleeper_id: 's2', created_at: 'x' }),
+    incomplete.removeIncomplete('u1', 'AAA'),
+    incomplete.addIncomplete('u1', { tag: 'CCC', sleeper_id: 's3', created_at: 'x' }),
+  ]);
+  assert.deepEqual(plain(await incomplete.listIncomplete('u1')).map((e) => e.tag).sort(), ['BBB', 'CCC']);
+});

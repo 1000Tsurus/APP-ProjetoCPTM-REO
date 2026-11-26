@@ -8,6 +8,9 @@ import { useSession } from '@/contexts/SessionContext';
 import { readerStatusText, syncStatusText } from '@/data/status-text';
 import { useSync } from '@/data/use-sync';
 
+/** Bordas da tela abaixo da faixa: o recuo do topo já foi consumido pela faixa. */
+export const EDGES_BELOW_STRIP: ('left' | 'right' | 'bottom')[] = ['left', 'right', 'bottom'];
+
 const TONE = {
   ok: { bg: COLOR.greenTint, fg: COLOR.green },
   warn: { bg: COLOR.amberTint, fg: COLOR.amber },

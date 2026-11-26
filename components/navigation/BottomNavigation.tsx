@@ -9,11 +9,11 @@ type IconName = React.ComponentProps<typeof Ionicons>['name'];
 // Ícone de cada aba; o rótulo vem do `title` definido no layout.
 const ICONS: Record<string, IconName> = {
   index: 'home-outline',
-  dormentes: 'layers-outline',
+  consultar: 'search-outline',
   perfil: 'person-outline',
 };
 
-/** Barra de abas de baixo (Início, Dormentes, Perfil); aba ativa em vermelho. */
+/** Barra de abas de baixo (Início, Consultar, Perfil); aba ativa em vermelho. */
 export function BottomNavigation({ state, descriptors, navigateToTab, insets }: MaterialTopTabBarProps) {
   return (
     <View style={[styles.container, { paddingBottom: Math.max(6, insets.bottom) }]}>

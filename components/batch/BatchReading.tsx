@@ -1,7 +1,6 @@
 import { useRef } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
-import { StatusStrip } from '@/components/StatusStrip';
 import { Button, EmptyState } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useReader } from '@/contexts/ReaderContext';
@@ -28,7 +27,6 @@ export function BatchReading({ task, userId, onDone }: Props) {
 
   return (
     <View style={styles.flex}>
-      <StatusStrip />
       <View style={styles.header}>
         <Text style={styles.title} numberOfLines={2}>
           {taskTitle(task)}
