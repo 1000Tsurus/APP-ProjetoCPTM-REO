@@ -9,6 +9,7 @@ export function createKeyboardReader(): TagReader & { push(raw: string): void } 
   const listeners = new Set<(tag: string) => void>();
   return {
     status: (): ReaderStatus => 'none',
+    mode: () => null,
     subscribe(onTag) {
       listeners.add(onTag);
       return () => {

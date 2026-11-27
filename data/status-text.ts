@@ -1,4 +1,4 @@
-import type { ReaderStatus } from './reader/types';
+import type { ReaderMode, ReaderStatus } from './reader/types';
 
 export type StatusTone = 'ok' | 'warn' | 'error';
 
@@ -37,10 +37,11 @@ export function syncStatusText(s: {
 }
 
 /** Rótulo do estado do leitor na faixa de status. */
-export function readerStatusText(s: ReaderStatus): string {
+export function readerStatusText(s: ReaderStatus, mode?: ReaderMode | null): string {
   switch (s) {
     case 'connected':
-      return '● Conectado';
+      // Chave fora de LEITURA: conectado, mas o leitor não está lendo tags.
+      return mode && mode !== 'LEITURA' ? '● Conectado · chave fora de leitura' : '● Conectado';
     case 'disconnected':
       return '○ Desconectado';
     case 'connecting':

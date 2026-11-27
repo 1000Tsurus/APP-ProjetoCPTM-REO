@@ -41,3 +41,11 @@ test('readerStatusText', () => {
   assert.equal(readerStatusText('connecting'), 'Conectando…');
   assert.equal(readerStatusText('none'), 'Teclado');
 });
+
+test('readerStatusText com modo da chave', () => {
+  assert.equal(readerStatusText('connected', 'GRAVACAO'), '● Conectado · chave fora de leitura');
+  assert.equal(readerStatusText('connected', 'DESLIGADO'), '● Conectado · chave fora de leitura');
+  assert.equal(readerStatusText('connected', 'LEITURA'), '● Conectado');
+  assert.equal(readerStatusText('connected', null), '● Conectado');
+  assert.equal(readerStatusText('disconnected', 'GRAVACAO'), '○ Desconectado');
+});
