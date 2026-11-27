@@ -115,3 +115,13 @@ O teste de integração não cobre o aparelho. Conferir num Android real:
 - [ ] Retirada de dormente descartado volta rejeitada na Fila com o motivo; descartar remove.
 - [ ] Fechar o app com item pendente e reabrir: o item continua.
 - [ ] Usuário `supervisor` não vê botões de registro.
+
+## Gerar o APK no Windows (build local, sem conta Expo)
+
+- O `ninja` do CMake 3.22.1 do Android SDK não aceita caminhos longos: instale o CMake 3.31.6
+  (`sdkmanager "cmake;3.31.6"`) e ponha `cmake.dir=<sdk>/cmake/3.31.6` em `android/local.properties`.
+- Compile a partir de um caminho curto (ex.: copie o projeto para `C:\r` e rode `npm ci` lá);
+  `subst` não serve, porque o autolinking do Expo não acha o `package.json` na raiz de uma unidade.
+- Use o JDK 17 do Android Studio: `$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"`.
+- `npx expo prebuild -p android` e depois `cd android; .\gradlew assembleRelease`.
+  APK em `android\app\build\outputs\apk\release\app-release.apk` (assinado com chave de debug: só teste).
