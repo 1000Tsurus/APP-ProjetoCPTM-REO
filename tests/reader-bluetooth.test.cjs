@@ -102,3 +102,27 @@ test('close cancela tudo, desconecta e não tenta mais', async () => {
   assert.equal(s.st.connects.length, n);
   assert.equal(s.st.lineFns.size, 0);
 });
+
+test('rejeição + onState(false) não pula a espera', async () => {
+  const s = setup({ failConnect: true });
+  await flush();
+  assert.equal(s.pending().length, 1);
+  assert.equal(s.pending()[0].ms, 1000);
+  s.state(false);
+  assert.equal(s.pending().length, 1);
+  assert.equal(s.pending()[0].ms, 1000);
+  await s.fire();
+  assert.equal(s.pending()[0].ms, 2000);
+});
+
+test('linha entregue depois de close() não emite nada', async () => {
+  const s = setup();
+  const tags = [];
+  s.reader.subscribe((t) => tags.push(t), () => {});
+  await flush();
+  s.state(true);
+  const fns = [...s.st.lineFns];
+  await s.reader.close();
+  fns.forEach((f) => f('TAG:AABB'));
+  assert.deepEqual(tags, []);
+});

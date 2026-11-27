@@ -71,6 +71,7 @@ export function createBluetoothReader(deps: {
   }
 
   const offLine = native.onLine((line) => {
+    if (closed) return;
     const parsed = parseReaderLine(line);
     if (parsed.kind === 'tag') {
       for (const l of [...tagListeners]) l(parsed.tag);
@@ -92,7 +93,7 @@ export function createBluetoothReader(deps: {
     }
     mode = null;
     // Falha durante uma conexão em andamento é tratada pelo catch do connect.
-    if (status === 'connecting') return;
+    if (status !== 'connected') return; // já desconectado: a falha do connect agendou a nova tentativa
     setStatus('disconnected');
     scheduleRetry();
   });
