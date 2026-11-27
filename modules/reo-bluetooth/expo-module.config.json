@@ -1,0 +1,6 @@
+{
+  "platforms": ["android"],
+  "android": {
+    "modules": ["br.com.cptm.reo.bluetooth.ReoBluetoothModule"]
+  }
+}
