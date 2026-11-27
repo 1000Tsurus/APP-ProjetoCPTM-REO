@@ -148,29 +148,33 @@ void enviaTag() {
   Saida.println();
 }
 
-bool autentica() {
+// Autentica o bloco de dados. `comoErro` = true (gravação) emite "ERRO:..." para o app;
+// na leitura o app só usa o UID, então a falha vira uma linha informativa, sem "ERRO:".
+bool autentica(bool comoErro) {
   MFRC522::StatusCode st = rfid.PCD_Authenticate(
       MFRC522::PICC_CMD_MF_AUTH_KEY_A, BLOCO_ESPECIE, &chave, &(rfid.uid));
   if (st != MFRC522::STATUS_OK) {
-    Saida.print("ERRO:autenticacao ");
-    Saida.println(rfid.GetStatusCodeName(st));
+    Saida.print(comoErro ? "ERRO:autenticacao " : "[LEITURA] Sem dados legiveis na tag (autenticacao ");
+    Saida.print(rfid.GetStatusCodeName(st));
+    if (!comoErro) Saida.print(")");
+    Saida.println();
     return false;
   }
   return true;
 }
 
 void modoLeitura() {
-  if (!autentica()) return;
+  if (!autentica(false)) return;
 
   byte b4[18], b5[18];
   byte tam = 18;
   if (rfid.MIFARE_Read(BLOCO_ESPECIE, b4, &tam) != MFRC522::STATUS_OK) {
-    Saida.println("ERRO:leitura bloco 4");
+    Saida.println("[LEITURA] Sem dados legiveis na tag (leitura bloco 4)");
     return;
   }
   tam = 18;
   if (rfid.MIFARE_Read(BLOCO_MEDIDAS, b5, &tam) != MFRC522::STATUS_OK) {
-    Saida.println("ERRO:leitura bloco 5");
+    Saida.println("[LEITURA] Sem dados legiveis na tag (leitura bloco 5)");
     return;
   }
 
@@ -212,7 +216,7 @@ void modoGravacao() {
     Saida.println("Envie primeiro os dados: especie;comp_cm;larg_cm;estado;volume_m3");
     return;
   }
-  if (!autentica()) return;
+  if (!autentica(true)) return;
 
   byte b4[16] = {0}, b5[16] = {0};
   memcpy(b4, dormenteGravar.especie, 16);

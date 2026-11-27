@@ -11,9 +11,9 @@ O app lê **só as linhas com os prefixos abaixo** e ignora o resto (as mensagen
 
 | Linha | Quando | O que o app faz |
 |---|---|---|
-| `TAG:04A1B2C3` | a cada tag aproximada (modo leitura ou gravação) | trata como leitura da tag: UID em hexadecimal maiúsculo, sem espaços (8 caracteres para UID de 4 bytes, 14 para 7 bytes) |
+| `TAG:04A1B2C3` | a cada tag aproximada (modo leitura ou gravação) | trata como leitura da tag (o app ignora em modo gravação): UID em hexadecimal maiúsculo, sem espaços (8 caracteres para UID de 4 bytes, 14 para 7 bytes) |
 | `MODO:LEITURA` / `MODO:GRAVACAO` / `MODO:DESLIGADO` | ao mudar a chave gangorra e logo que o app conecta | mostra na faixa de status; fora de `LEITURA` avisa que o leitor não está lendo |
-| `ERRO:<motivo>` | falha de autenticação, leitura ou gravação | mostra o motivo, sem bloquear o lote |
+| `ERRO:<motivo>` | falha de gravação ou de formato dos dados enviados | mostra o motivo, sem bloquear o lote. Falhas ao ler os blocos de dados em modo leitura NÃO são `ERRO:`: saem como linhas informativas (`[LEITURA] Sem dados legíveis na tag (...)`) |
 | `DORMENTE:esp;comp;larg;estado;vol` | modo leitura, tag com dados gravados | ignorada por enquanto (os dados do dormente vêm da API) |
 | `OK:GRAVACAO` | gravação na tag concluída | ignorada por enquanto |
 
