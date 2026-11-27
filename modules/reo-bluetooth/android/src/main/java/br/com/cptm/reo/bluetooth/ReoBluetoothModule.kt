@@ -48,7 +48,8 @@ class ReoBluetoothModule : Module() {
     Events("onLine", "onState")
 
     AsyncFunction("listBonded") {
-      val adapter = adapterOrNull() ?: return@AsyncFunction emptyList<Map<String, String>>()
+      val adapter = adapterOrNull() ?: throw BluetoothException("Este aparelho não tem Bluetooth.")
+      if (!adapter.isEnabled) throw BluetoothException("O Bluetooth está desligado. Ligue e tente de novo.")
       ensureConnectPermission()
       try {
         adapter.bondedDevices.orEmpty().map { device ->

@@ -4,7 +4,7 @@ import { createBluetoothReader } from '@/data/reader/bluetooth';
 import { forgetReader, getSavedReader, saveReader, type SavedReader } from '@/data/reader/device-store';
 import { createKeyboardReader } from '@/data/reader/keyboard';
 import type { TagReader } from '@/data/reader/types';
-import { isAvailable, nativeSerial } from '@/modules/reo-bluetooth';
+import { isAvailable, nativeSerial, requestPermissions } from '@/modules/reo-bluetooth';
 
 /**
  * Leitor de tags do app. `push` existe só no leitor por teclado (o campo de texto "digita" a tag);
@@ -13,6 +13,7 @@ import { isAvailable, nativeSerial } from '@/modules/reo-bluetooth';
 export type ReaderHandle = TagReader & {
   push?: (raw: string) => void;
   onReaderError?: (fn: (message: string) => void) => () => void;
+  lastError?: () => string | null;
   close?: () => Promise<void>;
 };
 
@@ -45,11 +46,17 @@ export function ReaderProvider({ children }: PropsWithChildren) {
   const [reader, setReader] = useState<ReaderHandle>(() => createKeyboardReader());
   const [saved, setSaved] = useState<SavedReader | null>(null);
   const current = useRef<ReaderHandle>(reader);
+  const seq = useRef(0); // trocas concorrentes: só a última vale
 
-  const swap = useCallback((next: SavedReader | null) => {
+  const swap = useCallback(async (next: SavedReader | null) => {
+    const mine = ++seq.current;
     const old = current.current;
     // Fecha o anterior antes de abrir o novo: dois leitores no mesmo aparelho brigam pela porta serial.
     void old.close?.();
+    // Pede a permissão uma vez antes de conectar; se negada, o leitor ainda é criado e a falha
+    // nativa ("sem permissão") aparece para o operador.
+    if (next && isAvailable()) await requestPermissions().catch(() => false);
+    if (mine !== seq.current) return; // outra troca (ou o desmonte) passou na frente
     const fresh = buildReader(next);
     current.current = fresh;
     setReader(fresh);
@@ -60,7 +67,7 @@ export function ReaderProvider({ children }: PropsWithChildren) {
     let alive = true;
     getSavedReader()
       .then((s) => {
-        if (alive && s) swap(s);
+        if (alive && s) return swap(s);
       })
       .catch(() => undefined);
     return () => {
@@ -68,16 +75,25 @@ export function ReaderProvider({ children }: PropsWithChildren) {
     };
   }, [swap]);
 
+  // Ao desmontar o provedor, solta a porta serial do leitor em uso.
+  useEffect(
+    () => () => {
+      seq.current += 1;
+      void current.current.close?.();
+    },
+    [],
+  );
+
   const settings = useMemo<ReaderSettings>(
     () => ({
       saved,
       async choose(r) {
         await saveReader(r);
-        swap(r);
+        await swap(r);
       },
       async forget() {
         await forgetReader();
-        swap(null);
+        await swap(null);
       },
     }),
     [saved, swap],

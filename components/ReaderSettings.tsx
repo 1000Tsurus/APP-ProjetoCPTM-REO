@@ -1,16 +1,37 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { Button, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
-import { useReaderSettings } from '@/contexts/ReaderContext';
+import { useReader, useReaderSettings, type ReaderHandle } from '@/contexts/ReaderContext';
 import { useReaderStatus } from '@/contexts/useReaderStatus';
 import { sortBonded } from '@/data/reader/bonded';
 import { isAvailable, listBonded, requestPermissions, type BondedDevice } from '@/modules/reo-bluetooth';
 
+/** Motivo da última falha de conexão do leitor (vazio no teclado ou depois de conectar). */
+function useLastError(reader: ReaderHandle): string | null {
+  const [reason, setReason] = useState<string | null>(reader.lastError?.() ?? null);
+  useEffect(() => {
+    setReason(reader.lastError?.() ?? null);
+    const offError = reader.onReaderError?.(() => setReason(reader.lastError?.() ?? null));
+    // Ao conectar o motivo some; o status avisa a mudança.
+    const offStatus = reader.subscribe(
+      () => {},
+      () => setReason(reader.lastError?.() ?? null),
+    );
+    return () => {
+      offError?.();
+      offStatus();
+    };
+  }, [reader]);
+  return reason;
+}
+
 /** Seção "Leitor" do Perfil: status, escolha do leitor Bluetooth pareado e esquecer o leitor. */
 export function ReaderSettings() {
   const { text } = useReaderStatus();
+  const reader = useReader();
+  const reason = useLastError(reader);
   const { saved, choose, forget } = useReaderSettings();
   const [devices, setDevices] = useState<BondedDevice[] | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -26,8 +47,9 @@ export function ReaderSettings() {
       const list = sortBonded(await listBonded());
       setDevices(list);
       if (list.length === 0) setMessage('Pareie o REO-Leitor nas configurações de Bluetooth do Android.');
-    } catch {
-      setMessage('Não foi possível listar os aparelhos pareados.');
+    } catch (e) {
+      // O módulo nativo já manda o motivo em português (ex.: Bluetooth desligado).
+      setMessage(e instanceof Error && e.message ? e.message : 'Não foi possível listar os aparelhos pareados.');
     }
   };
 
@@ -35,6 +57,7 @@ export function ReaderSettings() {
     <Panel style={styles.panel}>
       <SectionTitle icon="radio-outline" title="Leitor" />
       <Text style={styles.text}>{text}</Text>
+      {reason ? <Text style={styles.text}>{reason}</Text> : null}
       {saved ? (
         <Text style={styles.text}>
           {saved.name} <Text style={styles.code}>{saved.address}</Text>
@@ -53,7 +76,7 @@ export function ReaderSettings() {
               onPress={() => {
                 setDevices(null);
                 setMessage(null);
-                void forget();
+                forget().catch(() => setMessage('Não foi possível salvar o leitor.'));
               }}
             />
           ) : null}
@@ -71,7 +94,7 @@ export function ReaderSettings() {
             accessibilityLabel={`Usar ${d.name}`}
             onPress={() => {
               setDevices(null);
-              void choose({ address: d.address, name: d.name });
+              choose({ address: d.address, name: d.name }).catch(() => setMessage('Não foi possível salvar o leitor.'));
             }}
           >
             <Text style={styles.use}>Usar este</Text>

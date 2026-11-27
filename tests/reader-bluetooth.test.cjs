@@ -9,11 +9,11 @@ const { createBluetoothReader } = load('data/reader/bluetooth.ts', { './protocol
 const flush = () => new Promise((r) => setImmediate(r));
 
 function setup({ failConnect = false } = {}) {
-  const st = { connects: [], disconnects: 0, fail: failConnect, lineFns: new Set(), stateFns: new Set(), timers: [], cancelled: 0 };
+  const st = { connects: [], disconnects: 0, fail: failConnect, lineFns: new Set(), stateFns: new Set(), timers: [], cancelled: 0, message: null };
   const native = {
     connect: async (a) => {
       st.connects.push(a);
-      if (st.fail) throw new Error('falhou');
+      if (st.fail) throw new Error(st.message ?? 'falhou');
     },
     disconnect: async () => { st.disconnects++; },
     onLine: (fn) => { st.lineFns.add(fn); return () => st.lineFns.delete(fn); },
@@ -125,4 +125,53 @@ test('linha entregue depois de close() não emite nada', async () => {
   await s.reader.close();
   fns.forEach((f) => f('TAG:AABB'));
   assert.deepEqual(tags, []);
+});
+
+test('motivo da falha de connect chega ao onReaderError e a lastError()', async () => {
+  const s = setup({ failConnect: true });
+  s.st.message = 'O Bluetooth está desligado. Ligue e tente de novo.';
+  const errors = [];
+  s.reader.onReaderError((m) => errors.push(m));
+  await s.reader.reconnect();
+  assert.equal(s.reader.lastError(), 'O Bluetooth está desligado. Ligue e tente de novo.');
+  assert.deepEqual(errors, ['O Bluetooth está desligado. Ligue e tente de novo.']);
+  await s.fire(); // nova tentativa com a mesma mensagem
+  assert.equal(errors.length, 1);
+  s.st.message = 'Fora de alcance.';
+  await s.fire();
+  assert.deepEqual(errors.slice(1), ['Fora de alcance.']);
+});
+
+test('lastError() é limpo quando conecta', async () => {
+  const s = setup({ failConnect: true });
+  await flush();
+  assert.equal(s.reader.lastError(), 'falhou');
+  s.st.fail = false;
+  await s.fire();
+  s.state(true);
+  assert.equal(s.reader.lastError(), null);
+});
+
+test('TAG é ignorada com a chave em GRAVACAO', async () => {
+  const s = setup();
+  const tags = [];
+  s.reader.subscribe((t) => tags.push(t), () => {});
+  await flush();
+  s.state(true);
+  s.line('MODO:GRAVACAO');
+  s.line('TAG:04A1B2C3');
+  assert.deepEqual(tags, []);
+  s.line('MODO:LEITURA');
+  s.line('TAG:04A1B2C3');
+  assert.deepEqual(tags, ['04A1B2C3']);
+});
+
+test('reconnect com o leitor conectado não derruba o enlace', async () => {
+  const s = setup();
+  await flush();
+  s.state(true);
+  const before = s.st.connects.length;
+  await s.reader.reconnect();
+  assert.equal(s.st.connects.length, before);
+  assert.equal(s.reader.status(), 'connected');
 });

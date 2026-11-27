@@ -21,12 +21,17 @@ export function createBluetoothReader(deps: {
   native: NativeSerial;
   address: string;
   schedule: (fn: () => void, ms: number) => () => void;
-}): TagReader & { onReaderError(fn: (message: string) => void): () => void; close(): Promise<void> } {
+}): TagReader & {
+  onReaderError(fn: (message: string) => void): () => void;
+  lastError(): string | null;
+  close(): Promise<void>;
+} {
   const { native, address, schedule } = deps;
   const tagListeners = new Set<(tag: string) => void>();
   const statusListeners = new Set<(s: ReaderStatus) => void>();
   const errorListeners = new Set<(message: string) => void>();
   let status: ReaderStatus = 'disconnected';
+  let lastError: string | null = null; // motivo da última falha de conexão (some ao conectar)
   let mode: ReaderMode | null = null;
   let attempt = 0;
   let closed = false;
@@ -63,8 +68,14 @@ export function createBluetoothReader(deps: {
     setStatus('connecting');
     try {
       await native.connect(address);
-    } catch {
+    } catch (e) {
       if (closed || mine !== token) return;
+      const message = e instanceof Error && e.message ? e.message : 'Não foi possível conectar ao leitor.';
+      // Só avisa quando o motivo muda: cada nova tentativa falha igual e não deve repetir o aviso.
+      if (message !== lastError) {
+        lastError = message;
+        for (const l of [...errorListeners]) l(message);
+      }
       setStatus('disconnected');
       scheduleRetry();
     }
@@ -74,6 +85,8 @@ export function createBluetoothReader(deps: {
     if (closed) return;
     const parsed = parseReaderLine(line);
     if (parsed.kind === 'tag') {
+      // Chave em GRAVACAO: o leitor não está lendo para o app; a faixa já avisa, então não registra.
+      if (mode === 'GRAVACAO') return;
       for (const l of [...tagListeners]) l(parsed.tag);
     } else if (parsed.kind === 'mode') {
       mode = parsed.mode;
@@ -87,6 +100,7 @@ export function createBluetoothReader(deps: {
     if (closed) return;
     if (connected) {
       attempt = 0; // conexão boa: a próxima queda recomeça em 1s
+      lastError = null;
       clearWait();
       setStatus('connected');
       return;
@@ -102,6 +116,7 @@ export function createBluetoothReader(deps: {
 
   return {
     status: () => status,
+    lastError: () => lastError,
     mode: () => mode,
     subscribe(onTag, onStatus) {
       tagListeners.add(onTag);
@@ -118,6 +133,8 @@ export function createBluetoothReader(deps: {
       };
     },
     async reconnect() {
+      // O ESP32 aceita um cliente só: reconectar com o enlace bom derrubaria a leitura.
+      if (status === 'connected') return;
       attempt = 0;
       await connectNow();
     },
