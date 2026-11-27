@@ -19,7 +19,8 @@ export function BatchReading({ task, userId, onDone }: Props) {
   const reader = useReader();
   const run = useBatchRun(task, userId);
   // Com o leitor por teclado, o campo de texto passa pelo leitor: um só caminho para as duas rotas.
-  // Tag inválida o leitor descarta em silêncio; vai direto à sessão para mostrar o cartão de erro.
+  // Sem `push` (Bluetooth) a tag digitada vai direto à sessão, como a inválida, que o leitor
+  // descartaria em silêncio e precisa chegar à sessão para mostrar o cartão de erro.
   const submitTag = (tag: string) =>
     reader.push && isValidTag(normalizeTag(tag)) ? reader.push(tag) : run.handleTag(tag);
   const done = useRef(false);
@@ -46,7 +47,10 @@ export function BatchReading({ task, userId, onDone }: Props) {
         {run.card ? (
           <ReadCard read={run.card} canUndo={run.undoOpen} undoNote={run.undoNote} onUndo={() => void run.undoCard()} />
         ) : (
-          <EmptyState text="Aproxime o leitor de uma tag ou digite abaixo." />
+          <>
+            <EmptyState text="Aproxime o leitor de uma tag ou digite abaixo." />
+            {run.undoNote ? <Text style={styles.note}>{run.undoNote}</Text> : null}
+          </>
         )}
         <TagSearchField onRead={submitTag} autoFocus />
       </View>
@@ -74,6 +78,7 @@ export function BatchReading({ task, userId, onDone }: Props) {
 }
 
 const styles = StyleSheet.create({
+  note: { fontSize: FONT_SIZE.small, color: COLOR.amber },
   flex: { flex: 1 },
   header: {
     flexDirection: 'row',

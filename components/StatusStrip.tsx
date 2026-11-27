@@ -1,11 +1,11 @@
 import { useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLOR, FONT_SIZE, MIN_TOUCH } from '@/constants/theme';
 import { useReader } from '@/contexts/ReaderContext';
+import { useReaderStatus } from '@/contexts/useReaderStatus';
 import { useSession } from '@/contexts/SessionContext';
-import { readerStatusText, syncStatusText } from '@/data/status-text';
+import { syncStatusText } from '@/data/status-text';
 import { useSync } from '@/data/use-sync';
 
 /** Bordas da tela abaixo da faixa: o recuo do topo já foi consumido pela faixa. */
@@ -23,15 +23,7 @@ export function StatusStrip() {
   const reader = useReader();
   const { offline } = useSession();
   const { pending, rejected, syncing, lastOkAt } = useSync();
-  const [readerStatus, setReaderStatus] = useState(reader.status());
-
-  useEffect(() => {
-    setReaderStatus(reader.status());
-    return reader.subscribe(
-      () => undefined,
-      (s) => setReaderStatus(s),
-    );
-  }, [reader]);
+  const { status: readerStatus, text: readerText } = useReaderStatus();
 
   const sync = syncStatusText({ pending, rejected, offline, syncing, lastOkAt, now: new Date() });
   const tone = TONE[sync.tone];
@@ -45,7 +37,7 @@ export function StatusStrip() {
         style={styles.left}
       >
         <Text style={[styles.text, readerStatus === 'disconnected' ? { color: COLOR.amber } : null]} numberOfLines={1}>
-          {readerStatusText(readerStatus)}
+          {readerText}
         </Text>
       </Pressable>
       <Pressable
