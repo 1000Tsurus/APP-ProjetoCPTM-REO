@@ -80,11 +80,27 @@ O resto do app não sabe de onde vem a tag. `data/reader/types.ts` define:
 interface TagReader {
   status(): ReaderStatus; // 'connected' | 'disconnected' | 'connecting' | 'none'
   subscribe(onTag: (tag: string) => void, onStatus: (s: ReaderStatus) => void): () => void;
+  mode(): ReaderMode | null; // 'LEITURA' | 'GRAVACAO' | 'DESLIGADO' (só o Bluetooth)
   reconnect(): Promise<void>;
 }
 ```
 
-Hoje existe só o leitor em modo teclado (`data/reader/keyboard.ts`, status `none`). O leitor Bluetooth é a próxima tarefa e entra implementando essa interface, sem mexer nas telas.
+Há dois leitores: o de teclado/campo de texto (`data/reader/keyboard.ts`, status `none`) e o Bluetooth
+(`data/reader/bluetooth.ts`), que fala com o leitor de mão ESP32 + RC522 pelo módulo nativo próprio
+`modules/reo-bluetooth` (Kotlin, SPP). O `contexts/ReaderContext.tsx` usa o Bluetooth quando há um leitor
+escolhido no Perfil (`reo.reader.device`); senão, o de teclado. O campo de texto do lote funciona com os dois.
+
+### Leitor de mão (ESP32 + RC522)
+
+- Firmware e protocolo: `hardware/leitor-esp32/` (`leitor-esp32.ino`, `PROTOCOLO.md`). Grave com o Arduino IDE
+  num ESP32 clássico (WROOM/DevKit); o leitor aparece como `REO-Leitor`.
+- No Android: pareie o `REO-Leitor` uma vez nas configurações de Bluetooth. No app: Perfil › Leitor ›
+  Escolher leitor › Usar este. O app pede a permissão "Dispositivos próximos" (Android 12+).
+- O app reconecta sozinho quando a conexão cai (esperas de 1 s até 30 s); tocar no leitor na faixa tenta já.
+  Se a conexão falha, o motivo aparece no Perfil e no lote ("Leitor: ...").
+- Com a chave em gravação, a faixa avisa "chave fora de leitura" e as tags lidas não entram no lote.
+- O app usa só o UID da tag; os dados gravados na tag (blocos 4 e 5) são ignorados.
+- O leitor Bluetooth exige o app instalado (APK); no Expo Go o Perfil avisa e o app usa o teclado.
 
 ## Testes automatizados
 
