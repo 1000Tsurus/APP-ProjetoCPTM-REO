@@ -1,23 +1,24 @@
 # Painel operacional
 
-Após entrar ou concluir o cadastro, o inspetor acessa o início do RailLog Inspect.
-Nome, função e base são compartilhados por `contexts/SessionContext.tsx`.
-O último perfil fica no SecureStore (Android/iOS) ou no sessionStorage (web), sem senhas;
-o login só reutiliza seus dados quando a matrícula/e-mail corresponde. A sessão ativa é
-mantida em memória; recarregar o aplicativo exige nova entrada.
+Depois do login (matrícula ou e-mail e senha, validados pela API), o operador cai nas três
+páginas principais. Nome e papel vêm da sessão (`contexts/SessionContext.tsx`); o refresh
+token e o usuário ficam no SecureStore, nunca a senha.
 
-O painel inclui meta diária somente para leitura, categorias da via permanente,
-volume consolidado, filtros e detalhes das inspeções, lotes, histórico e perfil.
-Os dados de `data/operational-summary.ts` são demonstrativos, inclusive a meta da gestão.
-Ainda não há API de login, operações ou metas. GPS, captura e calibração LiDAR não são
-apresentados como ativos sem integração real.
+- **Início**: campo de tag com foco para o leitor RFID em modo teclado, aviso de registros
+  aguardando envio, data do último envio ao servidor e, para quem faz trabalho de campo,
+  o atalho "Registrar ocorrência sem dormente".
+- **Dormentes**: lista paginada vinda da API, com busca por tag ou ata e filtro por status.
+- **Perfil**: dados da sessão, estado da fila de envio, "Sincronizar agora" e "Sair".
 
-Sem `EXPO_PUBLIC_CREDENTIALS_API_URL`, o cadastro abre uma sessão demonstrativa local.
-Quando configurada, a URL recebe o formulário por POST e a tela inicial abre somente
-após uma resposta HTTP de sucesso. Falhas mantêm o formulário com a mensagem de erro.
-A liberação operacional e a autorização para alterar metas precisam ser verificadas
-pelo backend na integração dos serviços reais.
+A tela do dormente mostra os dados e o histórico, e oferece as ações conforme o papel:
+`operador` movimenta, registra ocorrência e cadastra dormente; `tecnico`, `especialista`
+e `admin` também inspecionam; `supervisor` só consulta. A autorização real é da API.
 
-Iniciar: `npm install` e `npm run web`.
-Verificar: `npx tsc --noEmit` e `npx expo export --platform web`.
+Movimentação, inspeção e ocorrência são gravadas na fila do aparelho e enviadas por
+`POST /sincronizacao/replicar` (detalhes em `docs/integracao-api.md`). A faixa "Sem conexão"
+acompanha a conectividade real: aparece quando uma requisição falha por rede e some assim
+que o servidor responde de novo.
+
+Iniciar: `npm install` e `npx expo start`.
+Verificar: `npm test`, `npm run typecheck` e `npx expo export --platform android`.
 Referência: https://docs.expo.dev/versions/v58.0.0/.

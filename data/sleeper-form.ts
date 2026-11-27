@@ -1,0 +1,83 @@
+// Validação do formulário da plaqueta do dormente (cliente), antes de enviar à API.
+
+import type { SleeperUpdate } from './api/types';
+
+export type SleeperFormField =
+  | 'rfid_tag'
+  | 'location_id'
+  | 'species_id'
+  | 'registration_record'
+  | 'wood_class'
+  | 'length_m'
+  | 'treatment'
+  | 'supplier'
+  | 'inspection_company'
+  | 'manufacture_year';
+
+/** Comprimento em metros: aceita vírgula ou ponto, maior que zero, até 2 casas. Vazio = não informado. */
+export function parseLength(raw: string): { value: number | null; error?: string } {
+  const text = raw.trim().replace(',', '.');
+  if (text === '') return { value: null };
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return { value: null, error: 'Use número com até 2 casas decimais.' };
+  const n = Number(text);
+  if (!(n > 0)) return { value: null, error: 'O comprimento deve ser maior que zero.' };
+  return { value: n };
+}
+
+/** Ano de fabricação: 4 dígitos entre 1900 e 2100. Vazio = não informado. */
+export function parseYear(raw: string): { value: number | null; error?: string } {
+  const text = raw.trim();
+  if (text === '') return { value: null };
+  if (!/^\d{4}$/.test(text)) return { value: null, error: 'Informe o ano com 4 dígitos.' };
+  const n = Number(text);
+  if (n < 1900 || n > 2100) return { value: null, error: 'O ano deve estar entre 1900 e 2100.' };
+  return { value: n };
+}
+
+/** Campo do formulário apontado pelo primeiro erro 422 (último elemento de `loc`), se for conhecido. */
+export function fieldFromErrors(errors?: { loc: (string | number)[] }[]): SleeperFormField | null {
+  const loc = errors?.[0]?.loc;
+  if (!loc || loc.length === 0) return null;
+  const last = String(loc[loc.length - 1]);
+  const known: SleeperFormField[] = [
+    'rfid_tag',
+    'location_id',
+    'species_id',
+    'registration_record',
+    'wood_class',
+    'length_m',
+    'treatment',
+    'supplier',
+    'inspection_company',
+    'manufacture_year',
+  ];
+  return known.find((f) => f === last) ?? null;
+}
+
+type PlateField =
+  | 'registration_record' | 'wood_class' | 'length_m' | 'treatment'
+  | 'supplier' | 'inspection_company' | 'manufacture_year' | 'species_id';
+
+/**
+ * Monta o PATCH da plaqueta a partir dos textos do formulário: campo vazio fica de fora (não apaga
+ * nada no servidor) e a espécie só vai se o papel puder editá-la.
+ */
+export function buildPlateUpdate(
+  form: Record<PlateField, string>,
+  canEditSpecies: boolean,
+): { payload: SleeperUpdate } | { error: string; field: SleeperFormField } {
+  const length = parseLength(form.length_m);
+  if (length.error) return { error: length.error, field: 'length_m' };
+  const year = parseYear(form.manufacture_year);
+  if (year.error) return { error: year.error, field: 'manufacture_year' };
+  const payload: SleeperUpdate = {};
+  const text = ['registration_record', 'wood_class', 'treatment', 'supplier', 'inspection_company'] as const;
+  for (const key of text) {
+    const v = form[key].trim();
+    if (v !== '') payload[key] = v;
+  }
+  if (length.value !== null) payload.length_m = length.value;
+  if (year.value !== null) payload.manufacture_year = year.value;
+  if (canEditSpecies && form.species_id.trim() !== '') payload.species_id = form.species_id.trim();
+  return { payload };
+}
