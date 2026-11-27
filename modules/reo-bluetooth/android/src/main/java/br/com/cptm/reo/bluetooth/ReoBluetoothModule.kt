@@ -90,8 +90,14 @@ class ReoBluetoothModule : Module() {
       promise.reject(BluetoothException("Não foi possível conectar ao leitor.", e))
       return
     }
+    // Trocada por outra conexão (ou desconectada) enquanto conectava: não anuncia nada.
+    if (!isCurrent(connection)) {
+      closeQuietly(connection)
+      promise.reject(BluetoothException("Conexão substituída."))
+      return
+    }
     promise.resolve()
-    sendEvent("onState", mapOf("connected" to true))
+    if (isCurrent(connection)) sendEvent("onState", mapOf("connected" to true))
     readLines(connection, socket)
   }
 
@@ -140,7 +146,7 @@ class ReoBluetoothModule : Module() {
         for (i in 0 until count) {
           val b = buffer[i]
           if (b == '\n'.code.toByte()) {
-            emitLine(line.toByteArray())
+            emitLine(connection, line.toByteArray())
             line.reset()
           } else if (line.size() < MAX_LINE_BYTES) {
             line.write(b.toInt())
@@ -156,9 +162,10 @@ class ReoBluetoothModule : Module() {
     if (stillCurrent) sendEvent("onState", mapOf("connected" to false))
   }
 
-  private fun emitLine(bytes: ByteArray) {
+  /** Emite a linha só se a conexão ainda for a atual (uma substituída nunca fala). */
+  private fun emitLine(connection: Connection, bytes: ByteArray) {
     val text = String(bytes, Charsets.UTF_8).trimEnd('\r')
-    if (text.isNotEmpty()) sendEvent("onLine", mapOf("line" to text))
+    if (text.isNotEmpty() && isCurrent(connection)) sendEvent("onLine", mapOf("line" to text))
   }
 
   /** Troca a conexão atual e devolve a anterior (que deve ser fechada). */
