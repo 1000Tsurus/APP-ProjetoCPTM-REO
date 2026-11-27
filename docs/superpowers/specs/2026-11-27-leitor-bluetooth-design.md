@@ -48,15 +48,13 @@ digitada, sem mudar as telas de lote. Protocolo: `hardware/leitor-esp32/PROTOCOL
 - `contexts/ReaderContext.tsx`: com leitor salvo, usa o Bluetooth; senão, o de teclado.
   `TagReader` ganha `mode(): ReaderMode | null` (só o Bluetooth preenche).
 - Perfil: seção "Leitor" com a lista de pareados, "Usar este", "Esquecer" e o status.
-- Dependência nova: `react-native-bluetooth-classic`. Permissões Android 12+ (`BLUETOOTH_CONNECT`,
+- Módulo nativo próprio (Expo Module local em `modules/reo-bluetooth`, Kotlin), sem dependência de terceiros: decisão do usuário, porque a `react-native-bluetooth-classic` só tem versão RC e é da arquitetura antiga. Funções: `listBonded()`, `connect(address)`, `disconnect()`, `write(line)` e eventos `line`/`state`. Permissões Android 12+ (`BLUETOOTH_CONNECT`,
   `BLUETOOTH_SCAN`) pedidas na hora de listar/conectar; `BLUETOOTH`/`BLUETOOTH_ADMIN` para Android ≤ 11.
   O app passa a exigir build próprio (sai do Expo Go).
 
 ## Riscos a verificar antes de codar
 
-- **Compatibilidade da biblioteca com React Native 0.88 / nova arquitetura.** Se não funcionar pela
-  camada de compatibilidade, a alternativa é um módulo nativo pequeno (Expo Module em Kotlin) só com
-  listar pareados, conectar, ler linhas e desconectar.
+- Módulo nativo só é verificado no build e no aparelho (não roda no `node --test`).
 - Build local no Windows exige caminho curto e CMake 3.31.6 (ver `docs/integracao-api.md`).
 
 ## Testes
