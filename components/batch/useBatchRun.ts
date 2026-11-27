@@ -112,8 +112,11 @@ export function useBatchRun(task: BatchTask, userId: string) {
     const offSession = session.subscribe(refresh);
     const offOutbox = subscribeOutbox(refresh);
     const offReader = reader.subscribe(handleTag, () => undefined);
+    // ERRO: do leitor vira aviso curto; não registra leitura.
+    const offError = reader.onReaderError?.((message) => setUndoNote(`Leitor: ${message}`));
     stopRef.current = () => {
       offReader();
+      offError?.();
     };
     return () => {
       alive = false;

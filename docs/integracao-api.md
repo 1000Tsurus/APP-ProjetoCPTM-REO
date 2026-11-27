@@ -80,11 +80,27 @@ O resto do app não sabe de onde vem a tag. `data/reader/types.ts` define:
 interface TagReader {
   status(): ReaderStatus; // 'connected' | 'disconnected' | 'connecting' | 'none'
   subscribe(onTag: (tag: string) => void, onStatus: (s: ReaderStatus) => void): () => void;
+  mode(): ReaderMode | null; // 'LEITURA' | 'GRAVACAO' | 'DESLIGADO' (só o Bluetooth)
   reconnect(): Promise<void>;
 }
 ```
 
-Hoje existe só o leitor em modo teclado (`data/reader/keyboard.ts`, status `none`). O leitor Bluetooth é a próxima tarefa e entra implementando essa interface, sem mexer nas telas.
+Há dois leitores: o de teclado/campo de texto (`data/reader/keyboard.ts`, status `none`) e o Bluetooth
+(`data/reader/bluetooth.ts`), que fala com o leitor de mão ESP32 + RC522 pelo módulo nativo próprio
+`modules/reo-bluetooth` (Kotlin, SPP). O `contexts/ReaderContext.tsx` usa o Bluetooth quando há um leitor
+escolhido no Perfil (`reo.reader.device`); senão, o de teclado. O campo de texto do lote funciona com os dois.
+
+### Leitor de mão (ESP32 + RC522)
+
+- Firmware e protocolo: `hardware/leitor-esp32/` (`leitor-esp32.ino`, `PROTOCOLO.md`). Grave com o Arduino IDE
+  num ESP32 clássico (WROOM/DevKit); o leitor aparece como `REO-Leitor`.
+- No Android: pareie o `REO-Leitor` uma vez nas configurações de Bluetooth. No app: Perfil › Leitor ›
+  Escolher leitor › Usar este. O app pede a permissão "Dispositivos próximos" (Android 12+).
+- O app reconecta sozinho quando a conexão cai (esperas de 1 s até 30 s); tocar no leitor na faixa tenta já.
+  Se a conexão falha, o motivo aparece no Perfil e no lote ("Leitor: ...").
+- Com a chave em gravação, a faixa avisa "chave fora de leitura" e as tags lidas não entram no lote.
+- O app usa só o UID da tag; os dados gravados na tag (blocos 4 e 5) são ignorados.
+- O leitor Bluetooth exige o app instalado (APK); no Expo Go o Perfil avisa e o app usa o teclado.
 
 ## Testes automatizados
 
@@ -115,3 +131,13 @@ O teste de integração não cobre o aparelho. Conferir num Android real:
 - [ ] Retirada de dormente descartado volta rejeitada na Fila com o motivo; descartar remove.
 - [ ] Fechar o app com item pendente e reabrir: o item continua.
 - [ ] Usuário `supervisor` não vê botões de registro.
+
+## Gerar o APK no Windows (build local, sem conta Expo)
+
+- O `ninja` do CMake 3.22.1 do Android SDK não aceita caminhos longos: instale o CMake 3.31.6
+  (`sdkmanager "cmake;3.31.6"`) e ponha `cmake.dir=<sdk>/cmake/3.31.6` em `android/local.properties`.
+- Compile a partir de um caminho curto (ex.: copie o projeto para `C:\r` e rode `npm ci` lá);
+  `subst` não serve, porque o autolinking do Expo não acha o `package.json` na raiz de uma unidade.
+- Use o JDK 17 do Android Studio: `$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"`.
+- `npx expo prebuild -p android` e depois `cd android; .\gradlew assembleRelease`.
+  APK em `android\app\build\outputs\apk\release\app-release.apk` (assinado com chave de debug: só teste).
