@@ -102,6 +102,27 @@ export type SleeperCreate = {
   client_uuid?: string | null;
 };
 
+/** Correção da plaqueta de um dormente já cadastrado (PATCH); só vão os campos informados. */
+export type SleeperUpdate = {
+  registration_record?: string | null;
+  wood_class?: string | null;
+  length_m?: number | null;
+  treatment?: string | null;
+  supplier?: string | null;
+  inspection_company?: string | null;
+  manufacture_year?: number | null;
+  species_id?: string | null;
+};
+
+/** Leitura de tag desconhecida feita offline; o sync a resolve em movimento ou cadastro pendente. */
+export type ResolvePayload = {
+  rfid_tag: string;
+  to_location_id: string;
+  location_name: string;
+  occurred_at: string;
+  client_uuid: string;
+};
+
 /** Referência ao dormente: informar `rfid_tag` ou `sleeper_id`. */
 export type SleeperRef = { rfid_tag?: string | null; sleeper_id?: string | null };
 
@@ -216,4 +237,3 @@ export type SyncBatchRead = {
   results: SyncItemResult[];
 };
 
-export type SyncStatusRead = { last_batch: SyncBatchRead | null; server_time: string };

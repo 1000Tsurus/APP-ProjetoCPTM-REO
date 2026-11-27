@@ -6,8 +6,8 @@ import type {
   SleeperHistory,
   SleeperRead,
   SleeperStatus,
+  SleeperUpdate,
   SpeciesRead,
-  SyncStatusRead,
   UserRead,
 } from './types';
 
@@ -64,6 +64,11 @@ export async function createSleeper(
   return { status, sleeper: data };
 }
 
+/** Completa ou corrige a plaqueta (PATCH parcial) de um dormente já cadastrado. */
+export function updateSleeper(id: string, body: SleeperUpdate): Promise<SleeperRead> {
+  return request<SleeperRead>('PATCH', `/dormentes/${encodeURIComponent(id)}`, body);
+}
+
 /** Espécies ativas (até 200), para os seletores. */
 export function listSpecies(): Promise<Page<SpeciesRead>> {
   return request<Page<SpeciesRead>>('GET', `/especies${query({ limit: 200, active: true })}`);
@@ -72,9 +77,4 @@ export function listSpecies(): Promise<Page<SpeciesRead>> {
 /** Locais ativos (até 200), para os seletores. */
 export function listLocations(): Promise<Page<LocationRead>> {
   return request<Page<LocationRead>>('GET', `/locais${query({ limit: 200, active: true })}`);
-}
-
-/** Último lote sincronizado por este aparelho (e a hora do servidor). */
-export function getSyncStatus(deviceId: string): Promise<SyncStatusRead> {
-  return request<SyncStatusRead>('GET', `/sincronizacao/status${query({ device_id: deviceId })}`);
 }

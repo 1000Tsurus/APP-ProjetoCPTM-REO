@@ -9,6 +9,7 @@ import 'react-native-reanimated';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { COLOR } from '@/constants/theme';
+import { ReaderProvider } from '@/contexts/ReaderContext';
 import { SessionProvider, useSession } from '@/contexts/SessionContext';
 
 export {
@@ -61,15 +62,17 @@ function RootLayoutNav() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaRoot>
         <SessionProvider>
+          <ReaderProvider>
           <SessionGate>
           <ThemeProvider value={APP_THEME}>
             <Stack screenOptions={swipeStackOptions}>
               <Stack.Screen name="index" />
               <Stack.Screen name="login" />
-              <Stack.Screen name="(tabs)" />
+              <Stack.Screen name="(app)" />
             </Stack>
           </ThemeProvider>
           </SessionGate>
+          </ReaderProvider>
         </SessionProvider>
       </SafeAreaRoot>
     </GestureHandlerRootView>

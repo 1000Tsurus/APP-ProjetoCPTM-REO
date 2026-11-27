@@ -1,22 +1,36 @@
 import { type Href, useRouter } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Banner, Button, Label, Panel, SectionTitle } from '@/components/ui';
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
+import { Badge, Button, Label, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
+import { useReader } from '@/contexts/ReaderContext';
 import { useSession } from '@/contexts/SessionContext';
 import { label, ROLE_LABEL } from '@/data/labels';
+import { readerStatusText } from '@/data/status-text';
 import { useSync } from '@/data/use-sync';
 
-/** Perfil: dados do usuário, situação da fila, sincronização manual e saída. */
+/** Perfil: dados do usuário, leitor, situação da fila, sincronização manual e saída. */
 export default function ProfileScreen() {
   const router = useRouter();
-  const { user, offline, signOut } = useSession();
+  const { user, signOut } = useSession();
   const { pending, rejected, syncing, syncNow } = useSync();
+  const reader = useReader();
+  const [readerStatus, setReaderStatus] = useState(reader.status());
+
+  useEffect(() => {
+    setReaderStatus(reader.status());
+    return reader.subscribe(
+      () => undefined,
+      (s) => setReaderStatus(s),
+    );
+  }, [reader]);
 
   return (
-    <SafeAreaView style={styles.screen}>
-      {offline ? <Banner tone="warn" text="Sem conexão" /> : null}
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <Panel style={styles.panel}>
           <Label>Nome</Label>
@@ -25,6 +39,12 @@ export default function ProfileScreen() {
           <Text style={[styles.text, { fontFamily: FONT_CODE }]}>{user?.registration}</Text>
           <Label>Papel</Label>
           {user ? <Badge text={label(ROLE_LABEL, user.role)} tone="info" /> : null}
+        </Panel>
+
+        <Panel style={styles.panel}>
+          <SectionTitle icon="radio-outline" title="Leitor" />
+          <Text style={styles.text}>{readerStatusText(readerStatus)}</Text>
+          <Text style={styles.text}>Leitor Bluetooth: em breve.</Text>
         </Panel>
 
         <Panel style={styles.panel}>

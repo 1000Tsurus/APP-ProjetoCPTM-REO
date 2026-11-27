@@ -26,6 +26,7 @@ function setup(handler, storage = memory()) {
     ...common,
     './outbox': outbox,
     './api/client': { request, NetworkError },
+    './sync-register': { sendRegistrations: async () => ({ registered: 0, converted: 0, rejected: 0 }) },
     './uuid': { uuidv4: uid },
   });
   return { outbox, sync, calls, storage };
@@ -100,7 +101,7 @@ test('syncNow: accepted e duplicate saem; rejected fica com code e reason', asyn
   const items = [item(), item(), item()];
   for (const i of items) await outbox.enqueue('u1', i);
   const r = await sync.syncNow('u1');
-  assert.deepEqual(plain(r), { sent: 3, accepted: 2, rejected: 1 });
+  assert.deepEqual(plain(r), { sent: 3, accepted: 2, rejected: 1, registered: 0 });
   assert.equal(calls[0].method, 'POST');
   assert.equal(calls[0].path, '/sincronizacao/replicar');
   assert.ok(calls[0].body.device_id);
@@ -167,7 +168,7 @@ test('duas chamadas simultâneas: a segunda é busy e request roda uma vez', asy
   const { outbox, sync, calls } = setup(acceptAll);
   await outbox.enqueue('u1', item());
   const [a, b] = await Promise.all([sync.syncNow('u1'), sync.syncNow('u1')]);
-  assert.deepEqual(plain(a), { sent: 1, accepted: 1, rejected: 0 });
+  assert.deepEqual(plain(a), { sent: 1, accepted: 1, rejected: 0, registered: 0 });
   assert.equal(b, 'busy');
   assert.equal(calls.length, 1);
 });
@@ -185,7 +186,7 @@ test('1500 pendentes viram duas chamadas (1000 + 500)', async () => {
   const { outbox, sync, calls } = setup(acceptAll);
   for (let i = 0; i < 1500; i++) await outbox.enqueue('u1', item());
   const r = await sync.syncNow('u1');
-  assert.deepEqual(plain(r), { sent: 1500, accepted: 1500, rejected: 0 });
+  assert.deepEqual(plain(r), { sent: 1500, accepted: 1500, rejected: 0, registered: 0 });
   assert.equal(calls.length, 2);
   assert.equal(calls[0].body.movements.length, 1000);
   assert.equal(calls[1].body.movements.length, 500);
@@ -246,7 +247,7 @@ test('enqueue durante o sync não se perde', async () => {
   const late = item();
   await outbox.enqueue('u1', late);
   release();
-  assert.deepEqual(plain(await running), { sent: 2, accepted: 1, rejected: 0 });
+  assert.deepEqual(plain(await running), { sent: 2, accepted: 1, rejected: 0, registered: 0 });
   const list = await outbox.listOutbox('u1');
   assert.equal(list.length, 1);
   assert.equal(list[0].client_uuid, late.client_uuid);
@@ -277,7 +278,7 @@ test('item novo durante o sync é enviado numa rodada extra (um save que recebeu
   await outbox.enqueue('u1', item());
   assert.equal(await sync.syncNow('u1'), 'busy');
   release();
-  assert.deepEqual(plain(await running), { sent: 2, accepted: 2, rejected: 0 });
+  assert.deepEqual(plain(await running), { sent: 2, accepted: 2, rejected: 0, registered: 0 });
   assert.equal(calls.length, 2);
   assert.equal(await outbox.pendingCount('u1'), 0);
 });

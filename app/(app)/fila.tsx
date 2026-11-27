@@ -3,14 +3,22 @@ import { useCallback, useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { Badge, Banner, Button, EmptyState, Panel, SectionTitle } from '@/components/ui';
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
+import { Badge, Button, EmptyState, Panel, SectionTitle } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { errorMessage } from '@/data/api/client';
 import { useSession } from '@/contexts/SessionContext';
 import { discard, listOutbox, subscribeOutbox, type OutboxItem } from '@/data/outbox';
 import { useSync } from '@/data/use-sync';
 
-const TYPE_LABEL = { movement: 'Movimentação', inspection: 'Inspeção', occurrence: 'Ocorrência' } as const;
+const TYPE_LABEL = {
+  movement: 'Movimentação',
+  inspection: 'Inspeção',
+  occurrence: 'Ocorrência',
+  register: 'Cadastro',
+  resolve: 'Leitura',
+} as const;
 
 /** Linha de um item da fila; rejeitado mostra o motivo e só permite descartar. */
 function QueueRow({ item, onDiscard }: { item: OutboxItem; onDiscard?: () => void }) {
@@ -37,7 +45,7 @@ function QueueRow({ item, onDiscard }: { item: OutboxItem; onDiscard?: () => voi
 /** Fila offline do usuário: pendentes, rejeitados (com motivo) e envio manual. */
 export default function QueueScreen() {
   const router = useRouter();
-  const { user, offline } = useSession();
+  const { user } = useSession();
   const { syncing, syncNow, lastResult } = useSync();
   const [items, setItems] = useState<OutboxItem[]>([]);
 
@@ -68,7 +76,11 @@ export default function QueueScreen() {
   let note: string | null = null;
   if (tapped && !syncing) {
     if (lastResult === 'offline') note = 'Sem conexão — tente de novo quando houver rede.';
-    else if (lastResult && lastResult.sent === 0) note = 'Nada para enviar.';
+    else if (lastResult && lastResult.sent === 0 && lastResult.registered === 0 && lastResult.rejected === 0) {
+      note = items.some((i) => i.status === 'pending')
+        ? 'Aguardando o prazo de desfazer.'
+        : 'Nada para enviar.';
+    } else if (lastResult && lastResult.sent === 0) note = `Cadastrados: ${lastResult.registered}, rejeitados: ${lastResult.rejected}.`;
     else if (lastResult) note = `Enviados: ${lastResult.sent} (aceitos ${lastResult.accepted}, rejeitados ${lastResult.rejected}).`;
   }
 
@@ -87,8 +99,7 @@ export default function QueueScreen() {
   const rejected = items.filter((i) => i.status === 'rejected');
 
   return (
-    <SafeAreaView style={styles.screen}>
-      {offline ? <Banner tone="warn" text="Sem conexão" /> : null}
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content}>
         <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />
         <Text style={styles.title}>Fila de envio</Text>
@@ -115,7 +126,7 @@ export default function QueueScreen() {
             <QueueRow key={i.client_uuid} item={i} onDiscard={() => confirmDiscard(i)} />
           ))}
           {rejected.length > 0 ? (
-            <Text style={styles.note}>Para corrigir, registre de novo pela tela do dormente e descarte o rejeitado.</Text>
+            <Text style={styles.note}>Para corrigir, leia a tag de novo em um lote (tela Início) e descarte o rejeitado.</Text>
           ) : null}
         </Panel>
       </ScrollView>

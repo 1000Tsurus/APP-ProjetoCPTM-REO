@@ -1,4 +1,4 @@
-import { Redirect } from 'expo-router';
+import { type Href, Redirect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -25,7 +25,7 @@ export default function LoginScreen() {
       </View>
     );
   }
-  if (user) return <Redirect href="/(tabs)/(pages)" />;
+  if (user) return <Redirect href={'/(app)/(tabs)/(pages)' as Href} />;
 
   const canSubmit = identifier.trim().length > 0 && password.length > 0 && !busy;
 

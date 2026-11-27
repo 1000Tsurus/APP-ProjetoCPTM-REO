@@ -95,8 +95,6 @@ test('endpoints: caminhos e query strings', async () => {
   assert.equal(calls.at(-1).path, '/dormentes?q=a%20b&status=in_stock&limit=10');
   await endpoints.listSleepers({});
   assert.equal(calls.at(-1).path, '/dormentes');
-  await endpoints.getSyncStatus('dev 1');
-  assert.equal(calls.at(-1).path, '/sincronizacao/status?device_id=dev%201');
   await endpoints.getSleeperHistory('abc');
   assert.equal(calls.at(-1).path, '/dormentes/abc/historico');
   await endpoints.getMe();

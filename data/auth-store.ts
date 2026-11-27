@@ -172,3 +172,8 @@ export function canFieldWork(role: Role): boolean {
 export function canInspect(role: Role): boolean {
   return role === 'tecnico' || role === 'especialista' || role === 'admin';
 }
+
+/** Papéis que podem definir ou trocar a espécie na plaqueta (decisão técnica de especialista). */
+export function canEditSpecies(role: Role): boolean {
+  return role === 'especialista' || role === 'admin';
+}

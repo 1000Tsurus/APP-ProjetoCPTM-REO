@@ -197,6 +197,12 @@ test('canFieldWork e canInspect por papel', () => {
   for (const r of ['tecnico', 'especialista', 'admin']) assert.equal(store.canInspect(r), true);
 });
 
+test('canEditSpecies: só especialista e admin', () => {
+  const { store } = setup(async () => tokens('operador'));
+  for (const r of ['supervisor', 'operador', 'tecnico']) assert.equal(store.canEditSpecies(r), false);
+  for (const r of ['especialista', 'admin']) assert.equal(store.canEditSpecies(r), true);
+});
+
 test('hook onNetwork: com sessão online, falha de rede vira offline e resposta volta a online', async () => {
   const { store, client } = setup(async () => tokens('tecnico'));
   await store.login('RL-1', 'x');

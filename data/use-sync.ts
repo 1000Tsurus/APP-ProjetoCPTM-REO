@@ -3,7 +3,7 @@ import { AppState } from 'react-native';
 
 import { useSession } from '@/contexts/SessionContext';
 import { listOutbox, subscribeOutbox } from './outbox';
-import { syncNow as runSync, type SyncSummary } from './sync';
+import { lastSyncAt, syncNow as runSync, type SyncSummary } from './sync';
 
 /** 'busy' nunca é guardado aqui: quem recebe 'busy' deixa o resultado para a sincronização em curso. */
 export type SyncResult = SyncSummary | 'offline' | null;
@@ -17,6 +17,7 @@ export function useSync(): {
   rejected: number;
   lastResult: SyncResult;
   syncing: boolean;
+  lastOkAt: string | null;
   syncNow: () => Promise<void>;
 } {
   const { user } = useSession();
@@ -24,6 +25,7 @@ export function useSync(): {
   const [counts, setCounts] = useState({ pending: 0, rejected: 0 });
   const [lastResult, setLastResult] = useState<SyncResult>(null);
   const [syncing, setSyncing] = useState(false);
+  const [lastOkAt, setLastOkAt] = useState<string | null>(null);
   const mounted = useRef(true);
   // Chamadas em andamento deste hook: 'busy' devolve na hora, mas a primeira sync segue rodando.
   const inFlight = useRef(0);
@@ -46,6 +48,11 @@ export function useSync(): {
     setCounts({ pending: items.length - rejected, rejected });
   }, [userId]);
 
+  const refreshLastOk = useCallback(async () => {
+    const at = userId ? await lastSyncAt(userId) : null;
+    if (mounted.current) setLastOkAt(at);
+  }, [userId]);
+
   const syncNow = useCallback(async () => {
     if (!userId) return;
     inFlight.current += 1;
@@ -59,14 +66,19 @@ export function useSync(): {
     } finally {
       inFlight.current -= 1;
       if (mounted.current) setSyncing(inFlight.current > 0);
-      await refreshCounts();
+      await refreshCounts().catch(() => undefined);
+      await refreshLastOk().catch(() => undefined);
     }
-  }, [userId, refreshCounts]);
+  }, [userId, refreshCounts, refreshLastOk]);
 
   // Resultado da sync é do usuário anterior: zera ao trocar de usuário.
   useEffect(() => {
     setLastResult(null);
   }, [userId]);
+
+  useEffect(() => {
+    refreshLastOk().catch(() => undefined);
+  }, [refreshLastOk]);
 
   useEffect(() => {
     void refreshCounts();
@@ -82,5 +94,5 @@ export function useSync(): {
     return () => sub.remove();
   }, [userId, syncNow]);
 
-  return { ...counts, lastResult, syncing, syncNow };
+  return { ...counts, lastResult, syncing, lastOkAt, syncNow };
 }

@@ -82,17 +82,24 @@ function buildStack() {
   const endpoints = L('data/api/endpoints.ts', { './client': client });
   const authStore = L('data/auth-store.ts', { 'expo-secure-store': secureStore, './api/client': client });
   const outbox = L('data/outbox.ts', { '@react-native-async-storage/async-storage': asyncStorage });
-  const sync = L('data/sync.ts', {
-    '@react-native-async-storage/async-storage': asyncStorage,
-    './api/client': client, './outbox': outbox, './uuid': uuid,
-  });
   const catalog = L('data/catalog-cache.ts', {
     '@react-native-async-storage/async-storage': asyncStorage,
     './api/client': client, './api/endpoints': endpoints,
   });
   const labels = L('data/labels.ts', {});
   const forms = L('data/forms.ts', { './labels': labels, './tag': tag });
-  return { net, client, endpoints, authStore, outbox, sync, catalog, forms, tag, uuid };
+  const incomplete = L('data/incomplete.ts', { '@react-native-async-storage/async-storage': asyncStorage });
+  const syncRegister = L('data/sync-register.ts', {
+    './api/client': client, './api/endpoints': endpoints, './catalog-cache': catalog,
+    './forms': forms, './incomplete': incomplete, './outbox': outbox,
+  });
+  const sync = L('data/sync.ts', {
+    '@react-native-async-storage/async-storage': asyncStorage,
+    './api/client': client, './outbox': outbox, './sync-register': syncRegister, './uuid': uuid,
+  });
+  const batch = L('data/batch.ts', { './forms': forms, './tag': tag });
+  const batchSession = L('data/batch-session.ts', { './batch': batch, './tag': tag });
+  return { net, client, endpoints, authStore, outbox, sync, catalog, forms, tag, uuid, incomplete, batchSession };
 }
 
 const creds = credentials();
@@ -150,7 +157,7 @@ test('integração com a API local', async (t) => {
     await s.outbox.enqueue(user.id, {
       type: 'movement', client_uuid: clientUuid, payload: built.payload, rfid_tag: tagCode, summary: built.summary,
     });
-    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 1, rejected: 0 });
+    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 1, rejected: 0, registered: 0 });
     assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
     const history = await s.endpoints.getSleeperHistory(sleeper.id);
     assert.ok(history.items.some(
@@ -177,12 +184,12 @@ test('integração com a API local', async (t) => {
     assert.equal(pending[0].status, 'pending');
 
     s.net.offline = false;
-    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 1, rejected: 0 });
+    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 1, rejected: 0, registered: 0 });
     assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
 
     // Mesmo client_uuid de novo: o servidor responde duplicate e o item sai da fila.
     await s.outbox.enqueue(user.id, item);
-    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 1, rejected: 0 });
+    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 1, rejected: 0, registered: 0 });
     assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
     const history = await s.endpoints.getSleeperHistory(sleeper.id);
     const same = history.items.filter((e) => e.type === 'inspection' && e.inspection.client_uuid === clientUuid);
@@ -203,7 +210,7 @@ test('integração com a API local', async (t) => {
     await s.outbox.enqueue(user.id, {
       type: 'movement', client_uuid: clientUuid, payload: built.payload, rfid_tag: ghost, summary: built.summary,
     });
-    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 0, rejected: 1 });
+    assert.deepEqual(plain(await s.sync.syncNow(user.id)), { sent: 1, accepted: 0, rejected: 1, registered: 0 });
     const list = await s.outbox.listOutbox(user.id);
     assert.equal(list.length, 1);
     assert.equal(list[0].status, 'rejected');
@@ -221,5 +228,119 @@ test('integração com a API local', async (t) => {
     const on = await s.authStore.restore();
     assert.equal(on.status, 'online');
     assert.equal(on.user.id, user.id);
+  });
+
+  await t.test('8. lote de transferência registra todos', async () => {
+    const tags = [1, 2, 3].map((n) => `${run}-L${n}`);
+    for (const code of tags) {
+      const made = await s.endpoints.createSleeper({
+        rfid_tag: code, location_id: warehouse.id, client_uuid: s.uuid.uuidv4(),
+      });
+      assert.equal(made.status, 201);
+    }
+    const session = s.batchSession.createBatchSession({
+      userId: user.id,
+      task: { kind: 'transfer', locationId: street.id, locationName: street.name },
+      lookup: (code) => s.catalog.lookupSleeper(code),
+      enqueue: s.outbox.enqueue,
+      undo: s.outbox.undo,
+      releaseHolds: s.outbox.releaseHolds,
+      sync: () => s.sync.syncNow(user.id),
+      uuid: s.uuid.uuidv4,
+      now,
+      schedule: () => () => {},
+    });
+    for (const code of tags) {
+      const read = await session.read(code.toLowerCase());
+      assert.equal(read.tone, 'ok', read.message);
+    }
+    await session.finish();
+    assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
+    for (const code of tags) {
+      const found = await s.endpoints.getSleeperByTag(code);
+      assert.equal(found.current_location.id, street.id);
+    }
+  });
+
+  await t.test('9. tag nova offline vira cadastro no sync e não duplica no reenvio', async () => {
+    const code = `${run}-N1`;
+    const clientUuid = s.uuid.uuidv4();
+    const item = {
+      type: 'resolve', client_uuid: clientUuid, rfid_tag: code, summary: `Leitura em ${street.name}`,
+      payload: {
+        rfid_tag: code, to_location_id: street.id, location_name: street.name,
+        occurred_at: now().toISOString(), client_uuid: clientUuid,
+      },
+    };
+    s.net.offline = true;
+    await s.outbox.enqueue(user.id, item);
+    assert.equal(await s.sync.syncNow(user.id), 'offline');
+    assert.equal((await s.outbox.listOutbox(user.id)).length, 1);
+
+    s.net.offline = false;
+    const first = plain(await s.sync.syncNow(user.id));
+    assert.equal(first.registered, 1);
+    assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
+    const created = await s.endpoints.getSleeperByTag(code);
+    assert.equal(created.current_location.id, street.id);
+
+    // Mesmo item de novo: a tag já existe e já está no local; não duplica nem derruba o sync.
+    await s.outbox.enqueue(user.id, item);
+    await s.sync.syncNow(user.id);
+    const page = await s.endpoints.listSleepers({ q: code });
+    assert.equal(page.items.filter((x) => x.rfid_tag === code).length, 1);
+    assert.equal((await s.endpoints.getSleeperByTag(code)).id, created.id);
+    for (const i of await s.outbox.listOutbox(user.id)) await s.outbox.discard(user.id, i.client_uuid);
+  });
+
+  await t.test('10. desfazer em espera não chega à API', async () => {
+    const code = `${run}-U1`;
+    const clientUuid = s.uuid.uuidv4();
+    await s.outbox.enqueue(user.id, {
+      type: 'register', client_uuid: clientUuid, rfid_tag: code, summary: `Cadastro em ${street.name}`,
+      payload: { rfid_tag: code, location_id: street.id, occurred_at: now().toISOString(), client_uuid: clientUuid },
+    }, { holdMs: 60000 });
+    assert.equal(await s.outbox.undo(user.id, clientUuid), true);
+    await s.sync.syncNow(user.id);
+    assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
+    await assert.rejects(() => s.endpoints.getSleeperByTag(code), (e) => e.status === 404);
+
+    // Movimentação de dormente existente: desfeita, o histórico não ganha o movimento.
+    const moveUuid = s.uuid.uuidv4();
+    const built = s.forms.buildMovement({
+      tag: tagCode, kind: 'transfer', toLocationId: warehouse.id, toLocationName: warehouse.name,
+      clientUuid: moveUuid, now: now(),
+    });
+    assert.ok(built.payload, built.error);
+    await s.outbox.enqueue(user.id, {
+      type: 'movement', client_uuid: moveUuid, payload: built.payload, rfid_tag: tagCode, summary: built.summary,
+    }, { holdMs: 60000 });
+    assert.equal(await s.outbox.undo(user.id, moveUuid), true);
+    await s.sync.syncNow(user.id);
+    const history = await s.endpoints.getSleeperHistory(sleeper.id);
+    assert.ok(!history.items.some((e) => e.type === 'movement' && e.movement.client_uuid === moveUuid));
+  });
+
+  await t.test('11. resolve de tag existente vira transferência', async () => {
+    const code = `${run}-R1`;
+    const made = await s.endpoints.createSleeper({
+      rfid_tag: code, location_id: warehouse.id, client_uuid: s.uuid.uuidv4(),
+    });
+    const clientUuid = s.uuid.uuidv4();
+    await s.outbox.enqueue(user.id, {
+      type: 'resolve', client_uuid: clientUuid, rfid_tag: code, summary: `Leitura em ${street.name}`,
+      payload: {
+        rfid_tag: code, to_location_id: street.id, location_name: street.name,
+        occurred_at: now().toISOString(), client_uuid: clientUuid,
+      },
+    });
+    const summary = plain(await s.sync.syncNow(user.id));
+    assert.equal(summary.registered, 0);
+    assert.equal(summary.accepted, 1);
+    assert.equal((await s.outbox.listOutbox(user.id)).length, 0);
+    const history = await s.endpoints.getSleeperHistory(made.sleeper.id);
+    assert.ok(history.items.some(
+      (e) => e.type === 'movement' && e.movement.client_uuid === clientUuid && e.movement.kind === 'transfer',
+    ));
   });
 });

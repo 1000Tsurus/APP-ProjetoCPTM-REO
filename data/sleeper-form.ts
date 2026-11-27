@@ -1,4 +1,6 @@
-// Validação do formulário de cadastro de dormente (cliente), antes de enviar à API.
+// Validação do formulário da plaqueta do dormente (cliente), antes de enviar à API.
+
+import type { SleeperUpdate } from './api/types';
 
 export type SleeperFormField =
   | 'rfid_tag'
@@ -50,4 +52,32 @@ export function fieldFromErrors(errors?: { loc: (string | number)[] }[]): Sleepe
     'manufacture_year',
   ];
   return known.find((f) => f === last) ?? null;
+}
+
+type PlateField =
+  | 'registration_record' | 'wood_class' | 'length_m' | 'treatment'
+  | 'supplier' | 'inspection_company' | 'manufacture_year' | 'species_id';
+
+/**
+ * Monta o PATCH da plaqueta a partir dos textos do formulário: campo vazio fica de fora (não apaga
+ * nada no servidor) e a espécie só vai se o papel puder editá-la.
+ */
+export function buildPlateUpdate(
+  form: Record<PlateField, string>,
+  canEditSpecies: boolean,
+): { payload: SleeperUpdate } | { error: string; field: SleeperFormField } {
+  const length = parseLength(form.length_m);
+  if (length.error) return { error: length.error, field: 'length_m' };
+  const year = parseYear(form.manufacture_year);
+  if (year.error) return { error: year.error, field: 'manufacture_year' };
+  const payload: SleeperUpdate = {};
+  const text = ['registration_record', 'wood_class', 'treatment', 'supplier', 'inspection_company'] as const;
+  for (const key of text) {
+    const v = form[key].trim();
+    if (v !== '') payload[key] = v;
+  }
+  if (length.value !== null) payload.length_m = length.value;
+  if (year.value !== null) payload.manufacture_year = year.value;
+  if (canEditSpecies && form.species_id.trim() !== '') payload.species_id = form.species_id.trim();
+  return { payload };
 }

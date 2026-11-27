@@ -1,16 +1,23 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkError, request } from './api/client';
 import type { SyncBatchRead, SyncItemResult } from './api/types';
-import { listOutbox, mutateOutbox, type OutboxItem, type OutboxType } from './outbox';
+import { isHeld, listOutbox, mutateOutbox, SYNC_GRACE_MS, type OutboxItem, type OutboxType } from './outbox';
+import { sendRegistrations } from './sync-register';
 import { uuidv4 } from './uuid';
 
 /** Limite de itens por chamada a /sincronizacao/replicar (teto da API). */
 const BATCH_SIZE = 1000;
 const DEVICE_KEY = 'reo.device_id';
+const lastKey = (userId: string) => `reo.sync.last.${userId}`;
 
-export type SyncSummary = { sent: number; accepted: number; rejected: number };
+/** `registered`: dormentes criados por cadastro/leitura pendente; `rejected` inclui os recusados no cadastro. */
+export type SyncSummary = { sent: number; accepted: number; rejected: number; registered: number };
 
-const LIST_OF: Record<OutboxType, 'movements' | 'inspections' | 'occurrences'> = {
+/** Tipos que vão no replicar; `register`/`resolve` são tratados antes, em sync-register. */
+type ReplicarType = Exclude<OutboxType, 'register' | 'resolve'>;
+type ReplicarItem = OutboxItem & { type: ReplicarType };
+
+const LIST_OF: Record<ReplicarType, 'movements' | 'inspections' | 'occurrences'> = {
   movement: 'movements',
   inspection: 'inspections',
   occurrence: 'occurrences',
@@ -42,7 +49,7 @@ export function deviceId(): Promise<string> {
 }
 
 /** Corpo do POST: cada payload vai na lista do seu tipo. */
-function buildBody(device: string, batch: OutboxItem[]) {
+function buildBody(device: string, batch: ReplicarItem[]) {
   const body = {
     device_id: device,
     movements: [] as unknown[],
@@ -51,6 +58,24 @@ function buildBody(device: string, batch: OutboxItem[]) {
   };
   for (const item of batch) body[LIST_OF[item.type]].push(item.payload);
   return body;
+}
+
+/** Pendentes que o replicar pode enviar agora: fora da espera do desfazer e sem cadastro/leitura. */
+function sendable(items: OutboxItem[], skip: Set<string>): ReplicarItem[] {
+  const now = new Date();
+  return items.filter(
+    (i): i is ReplicarItem =>
+      i.status === 'pending' &&
+      i.type !== 'register' &&
+      i.type !== 'resolve' &&
+      !isHeld(i, now, SYNC_GRACE_MS) &&
+      !skip.has(i.client_uuid),
+  );
+}
+
+/** Quando a última sincronização terminou bem neste aparelho (ISO), ou null se nunca. */
+export async function lastSyncAt(userId: string): Promise<string | null> {
+  return AsyncStorage.getItem(lastKey(userId));
 }
 
 function parseResults(data: unknown): SyncItemResult[] {
@@ -69,7 +94,7 @@ async function runPass(
   skip: Set<string>,
   summary: SyncSummary,
 ): Promise<Set<string> | 'offline'> {
-  const pending = (await listOutbox(userId)).filter((i) => i.status === 'pending' && !skip.has(i.client_uuid));
+  const pending = sendable(await listOutbox(userId), skip);
   const sent = new Set<string>();
 
   for (let start = 0; start < pending.length; start += BATCH_SIZE) {
@@ -128,20 +153,31 @@ async function runPass(
 export async function syncNow(userId: string): Promise<SyncSummary | 'offline' | 'busy'> {
   if (running) return 'busy';
   running = true;
-  const summary: SyncSummary = { sent: 0, accepted: 0, rejected: 0 };
+  const summary: SyncSummary = { sent: 0, accepted: 0, rejected: 0, registered: 0 };
   try {
     const first = (await listOutbox(userId)).some((i) => i.status === 'pending');
     if (!first) return summary;
     const device = await deviceId();
 
+    // Cadastros e leituras pendentes primeiro: o replicar não cria dormente.
+    const registrations = await sendRegistrations(userId, new Date());
+    if (registrations === 'offline') return 'offline';
+    summary.registered += registrations.registered;
+    summary.rejected += registrations.rejected;
+
     const sentFirst = await runPass(userId, device, new Set(), summary);
     if (sentFirst === 'offline') return 'offline';
 
-    const hasNew = (await listOutbox(userId)).some((i) => i.status === 'pending' && !sentFirst.has(i.client_uuid));
+    const hasNew = sendable(await listOutbox(userId), sentFirst).length > 0;
     if (hasNew) {
       const extra = await runPass(userId, device, sentFirst, summary);
       if (extra === 'offline') return 'offline';
     }
+    // Só marca "última sincronização" se algo chegou ao servidor ou se não sobrou nada pendente;
+    // com tudo em espera do desfazer, nada foi enviado e o horário seria enganoso.
+    const reachedServer = registrations.registered + registrations.converted + registrations.rejected > 0 || summary.sent > 0;
+    const nothingPending = !(await listOutbox(userId)).some((i) => i.status === 'pending');
+    if (reachedServer || nothingPending) await AsyncStorage.setItem(lastKey(userId), new Date().toISOString());
     return summary;
   } finally {
     running = false;

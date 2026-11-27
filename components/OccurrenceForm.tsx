@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { EDGES_BELOW_STRIP } from '@/components/StatusStrip';
+
 import { Banner, Button, ChoiceRow, Field, OptionPicker, Panel } from '@/components/ui';
 import { COLOR, FONT_CODE, FONT_SIZE, SPACE } from '@/constants/theme';
 import { useSession } from '@/contexts/SessionContext';
@@ -23,7 +25,7 @@ const KINDS = (Object.keys(OCCURRENCE_KIND) as OccurrenceKind[]).map((id) => ({ 
  */
 export function OccurrenceForm({ tag: fixedTag }: { tag?: string }) {
   const router = useRouter();
-  const { user, offline } = useSession();
+  const { user } = useSession();
   // Gerado uma vez ao abrir: toque duplo em "Salvar" não duplica o registro.
   const clientUuid = useRef(uuidv4()).current;
   // Trava síncrona contra toque duplo (o estado `saving` só muda no próximo render).
@@ -87,8 +89,7 @@ export function OccurrenceForm({ tag: fixedTag }: { tag?: string }) {
   }
 
   return (
-    <SafeAreaView style={styles.screen}>
-      {offline ? <Banner tone="warn" text="Sem conexão — será enviado depois" /> : null}
+    <SafeAreaView edges={EDGES_BELOW_STRIP} style={styles.screen}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <Button title="Voltar" icon="arrow-back" variant="ghost" small onPress={() => router.back()} />
